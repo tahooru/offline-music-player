@@ -1,6 +1,6 @@
 {
-    "name": "Offline Music Player",
-    "short_name": "Music",
+    "name": "T-Tune",
+    "short_name": "T-Tune",
     "theme_color": "#000000",
     "background_color": "#000000",
     "display": "standalone",

@@ -1,26 +1,169 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@theme {
+  --color-primary: #997174;
+  --color-secondary: #C8BCC6;
+  --color-brand-dark: #765457;
+  --color-brand-light: #AE898C;
+  --color-accent-soft: #D8C7CA;
+  --color-accent-pale: #E8DADC;
+  
+  --color-bg-midnight: #171416;
+  --color-bg-charcoal: #211D1F;
+  --color-surface-graphite: #2B2528;
+  --color-surface-taupe: #332C2F;
+  --color-surface-cocoa: #40383B;
+  --color-surface-ash: #51494C;
+  
+  --color-light-ivory: #F8F5F5;
+  --color-light-pearl: #F2EDEF;
+  --color-light-mist: #E9E3E6;
+  --color-light-silver: #DDD4D8;
+  --color-light-warm-grey: #CFC5C9;
+  --color-light-cloud: #FAF9F9;
+  
+  --color-text-white: #FFFFFF;
+  --color-text-soft-white: #F3EEEE;
+  --color-text-grey-white: #DDD6D8;
+  --color-text-muted: #AAA1A4;
+  --color-text-dark: #241E20;
+  --color-text-secondary: #625A5D;
+  
+  --color-status-success: #769B84;
+  --color-status-mint: #A5C5B2;
+  --color-status-warning: #C39A6B;
+  --color-status-amber: #D2B17D;
+  --color-status-error: #B86B70;
+  --color-status-soft-red: #D79A9E;
+  
+  --color-music-vinyl: #181517;
+  --color-music-gold: #B89A72;
+  --color-music-champagne: #D8C7A6;
+  --color-music-lavender: #AAA0C4;
+  --color-music-plum: #684D63;
+  --color-music-mauve-glow: #B98591;
 
-@theme inline {
+  /* Animation Durations */
+  --animate-duration-fast: 150ms;
+  --animate-duration-icon: 200ms;
+  --animate-duration-normal: 300ms;
+  --animate-duration-slow: 500ms;
+  --animate-duration-slower: 700ms;
+  --animate-duration-slowest: 1500ms;
+
+  /* Keyframes & Animations */
+  --animate-heart-pop: heart-pop var(--animate-duration-normal) ease-in-out;
+  @keyframes heart-pop {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.25); }
+  }
+
+  --animate-album-float: album-float 4.5s ease-in-out infinite;
+  @keyframes album-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+  }
+
+  --animate-visualizer-bar: visualizer-bar 500ms ease-in-out infinite alternate;
+  @keyframes visualizer-bar {
+    0% { transform: scaleY(0.2); }
+    100% { transform: scaleY(1); }
+  }
+
+  --animate-skeleton: skeleton 1.5s ease-in-out infinite;
+  @keyframes skeleton {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 0.8; }
+  }
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-pt-sans-narrow), Arial, Helvetica, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
+:root {
+  --background: var(--color-bg-midnight);
+  --foreground: var(--color-text-white);
+}
+
+@media (prefers-color-scheme: light) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: var(--color-light-ivory);
+    --foreground: var(--color-text-dark);
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+}
+
+/* Typography System */
+@utility text-app-logo { font-family: var(--font-sans); font-weight: 700; font-size: clamp(28px, 4vw, 32px); line-height: 1.0; letter-spacing: 0; }
+@utility text-hero-heading { font-family: var(--font-sans); font-weight: 700; font-size: clamp(28px, 4vw, 32px); line-height: 1.1; letter-spacing: 0; }
+@utility text-song-title { font-family: var(--font-sans); font-weight: 700; font-size: clamp(22px, 3vw, 26px); line-height: 1.15; letter-spacing: 0; }
+@utility text-artist-name { font-family: var(--font-sans); font-weight: 400; font-size: clamp(16px, 2vw, 18px); line-height: 1.3; letter-spacing: 0.01em; }
+@utility text-section-heading { font-family: var(--font-sans); font-weight: 700; font-size: clamp(20px, 2.5vw, 22px); line-height: 1.2; letter-spacing: 0; }
+@utility text-album-title { font-family: var(--font-sans); font-weight: 700; font-size: clamp(16px, 2vw, 18px); line-height: 1.2; letter-spacing: 0; }
+@utility text-track-title { font-family: var(--font-sans); font-weight: 700; font-size: 16px; line-height: 1.25; letter-spacing: 0; }
+@utility text-body { font-family: var(--font-sans); font-weight: 400; font-size: clamp(15px, 2vw, 16px); line-height: 1.4; letter-spacing: 0.01em; }
+@utility text-nav { font-family: var(--font-sans); font-weight: 700; font-size: clamp(13px, 1.5vw, 14px); line-height: 1.2; letter-spacing: 0.02em; }
+@utility text-btn { font-family: var(--font-sans); font-weight: 700; font-size: clamp(14px, 2vw, 16px); line-height: 1.0; letter-spacing: 0.02em; }
+@utility text-metadata { font-family: var(--font-sans); font-weight: 400; font-size: clamp(12px, 1.5vw, 14px); line-height: 1.3; letter-spacing: 0.02em; }
+@utility text-player-time { font-family: var(--font-sans); font-weight: 400; font-size: clamp(11px, 1.5vw, 13px); line-height: 1.0; letter-spacing: 0.02em; }
+@utility text-lyrics { font-family: var(--font-sans); font-weight: 400; font-size: clamp(20px, 2.5vw, 24px); line-height: 1.5; letter-spacing: 0; }
+@utility text-lyrics-active { font-family: var(--font-sans); font-weight: 700; font-size: clamp(22px, 3vw, 26px); line-height: 1.5; letter-spacing: 0; }
+@utility text-label { font-family: var(--font-sans); font-weight: 700; font-size: clamp(11px, 1.5vw, 12px); line-height: 1.0; letter-spacing: 0.08em; text-transform: uppercase; }
+@utility text-toast { font-family: var(--font-sans); font-weight: 700; font-size: 14px; line-height: 1.2; letter-spacing: 0; }
+
+/* Custom Scrollbar - Global Scope */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-light-silver) transparent;
+}
+
+@media (prefers-color-scheme: dark) {
+  html {
+    scrollbar-color: var(--color-surface-ash) transparent;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--color-light-silver);
+  border-radius: 10px;
+  border: 3px solid var(--background);
+}
+
+@media (prefers-color-scheme: dark) {
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--color-surface-ash);
+    border: 3px solid var(--background);
+  }
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-text-muted);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Hide scrollbar for horizontal mobile menus but keep functionality */
+.custom-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.custom-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

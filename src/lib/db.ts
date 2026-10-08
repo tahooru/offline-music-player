@@ -1,0 +1,202 @@
+import { openDB, DBSchema, IDBPDatabase } from 'idb';
+import { Song } from '@/store/playerStore';
+
+export interface Album {
+  id: string;
+  name: string;
+  cover?: string;
+  year?: string;
+}
+
+export interface Entity {
+  id: string;
+  name: string;
+  photoUrl?: string;
+}
+
+export interface Language {
+  id: string;
+  name: string;
+}
+
+export interface Playlist {
+  id: string;
+  name: string;
+  songIds: string[];
+  coverUrl?: string;
+  createdAt: number;
+}
+
+export interface UserData {
+  id: string;
+  data: any;
+}
+
+interface MusicPlayerDB extends DBSchema {
+  songs: {
+    key: string;
+    value: Song;
+    indexes: { 'by-title': string; 'by-singers': string };
+  };
+  albums: {
+    key: string;
+    value: Album;
+  };
+  singers: {
+    key: string;
+    value: Entity;
+  };
+  lyricists: {
+    key: string;
+    value: Entity;
+  };
+  musicians: {
+    key: string;
+    value: Entity;
+  };
+  languages: {
+    key: string;
+    value: Language;
+  };
+  playlists: {
+    key: string;
+    value: Playlist;
+  };
+  user_data: {
+    key: string;
+    value: UserData;
+  };
+}
+
+let dbPromise: Promise<IDBPDatabase<MusicPlayerDB>> | null = null;
+
+const UNIVERSAL_LANGUAGES = [
+  "English", "Spanish", "French", "German", "Italian", "Portuguese", "Russian", 
+  "Chinese (Mandarin)", "Japanese", "Korean", "Arabic", "Hindi", "Bengali", 
+  "Punjabi", "Telugu", "Marathi", "Tamil", "Urdu", "Gujarati", "Kannada", 
+  "Odia", "Malayalam", "Sindhi", "Nepali", "Sinhala", "Thai", "Vietnamese", 
+  "Indonesian", "Malay", "Tagalog", "Swahili", "Yoruba", "Zulu", "Amharic", 
+  "Turkish", "Persian", "Kurdish", "Dutch", "Polish", "Ukrainian", "Romanian", 
+  "Greek", "Hungarian", "Czech", "Swedish", "Finnish", "Danish", "Norwegian", 
+  "Hebrew"
+].sort();
+
+if (typeof window !== 'undefined') {
+  dbPromise = openDB<MusicPlayerDB>('offline-music-player', 4, {
+    upgrade(db, oldVersion, newVersion, transaction) {
+      if (!db.objectStoreNames.contains('songs')) {
+        const store = db.createObjectStore('songs', { keyPath: 'id' });
+        store.createIndex('by-title', 'title');
+        store.createIndex('by-singers', 'singers');
+      }
+      if (!db.objectStoreNames.contains('albums')) db.createObjectStore('albums', { keyPath: 'id' });
+      if (!db.objectStoreNames.contains('singers')) db.createObjectStore('singers', { keyPath: 'id' });
+      if (!db.objectStoreNames.contains('lyricists')) db.createObjectStore('lyricists', { keyPath: 'id' });
+      if (!db.objectStoreNames.contains('musicians')) db.createObjectStore('musicians', { keyPath: 'id' });
+      if (!db.objectStoreNames.contains('languages')) db.createObjectStore('languages', { keyPath: 'id' });
+      if (!db.objectStoreNames.contains('playlists')) db.createObjectStore('playlists', { keyPath: 'id' });
+      if (!db.objectStoreNames.contains('user_data')) db.createObjectStore('user_data', { keyPath: 'id' });
+    },
+  }).then(async (database) => {
+    // Seed languages if the store is completely empty
+    const tx = database.transaction('languages', 'readwrite');
+    const store = tx.objectStore('languages');
+    const count = await store.count();
+    if (count === 0) {
+      for (const lang of UNIVERSAL_LANGUAGES) {
+        await store.put({ id: lang.toLowerCase().replace(/[^a-z]/g, ''), name: lang });
+      }
+    }
+    return database;
+  });
+}
+
+export const db = {
+  // --- Songs ---
+  async getAllSongs(): Promise<Song[]> {
+    if (!dbPromise) return [];
+    const database = await dbPromise;
+    return database.getAll('songs');
+  },
+  async putSong(song: Song): Promise<void> {
+    if (!dbPromise) return;
+    const database = await dbPromise;
+    await database.put('songs', song);
+  },
+  async deleteSong(id: string): Promise<void> {
+    if (!dbPromise) return;
+    const database = await dbPromise;
+    await database.delete('songs', id);
+  },
+
+  // --- Albums ---
+  async getAllAlbums(): Promise<Album[]> {
+    if (!dbPromise) return [];
+    return (await dbPromise).getAll('albums');
+  },
+  async putAlbum(album: Album): Promise<void> {
+    if (!dbPromise) return;
+    await (await dbPromise).put('albums', album);
+  },
+  async deleteAlbum(id: string): Promise<void> {
+    if (!dbPromise) return;
+    await (await dbPromise).delete('albums', id);
+  },
+
+  // --- Entities (Generic) ---
+  async getAllEntities(storeName: 'singers' | 'lyricists' | 'musicians'): Promise<Entity[]> {
+    if (!dbPromise) return [];
+    return (await dbPromise).getAll(storeName);
+  },
+  async putEntity(storeName: 'singers' | 'lyricists' | 'musicians', entity: Entity): Promise<void> {
+    if (!dbPromise) return;
+    await (await dbPromise).put(storeName, entity);
+  },
+  async deleteEntity(storeName: 'singers' | 'lyricists' | 'musicians', id: string): Promise<void> {
+    if (!dbPromise) return;
+    await (await dbPromise).delete(storeName, id);
+  },
+
+  // --- Languages ---
+  async getAllLanguages(): Promise<Language[]> {
+    if (!dbPromise) return [];
+    return (await dbPromise).getAll('languages');
+  },
+  async putLanguage(language: Language): Promise<void> {
+    if (!dbPromise) return;
+    await (await dbPromise).put('languages', language);
+  },
+  async deleteLanguage(id: string): Promise<void> {
+    if (!dbPromise) return;
+    await (await dbPromise).delete('languages', id);
+  },
+
+  // --- Playlists ---
+  async getAllPlaylists(): Promise<Playlist[]> {
+    if (!dbPromise) return [];
+    return (await dbPromise).getAll('playlists');
+  },
+  async getPlaylist(id: string): Promise<Playlist | undefined> {
+    if (!dbPromise) return undefined;
+    return (await dbPromise).get('playlists', id);
+  },
+  async putPlaylist(playlist: Playlist): Promise<void> {
+    if (!dbPromise) return;
+    await (await dbPromise).put('playlists', playlist);
+  },
+  async deletePlaylist(id: string): Promise<void> {
+    if (!dbPromise) return;
+    await (await dbPromise).delete('playlists', id);
+  },
+
+  // --- User Data (Favorites) ---
+  async getFavorites(): Promise<string[]> {
+    if (!dbPromise) return [];
+    const data = await (await dbPromise).get('user_data', 'favorites');
+    return data ? data.data : [];
+  },
+  async saveFavorites(songIds: string[]): Promise<void> {
+    if (!dbPromise) return;
+    await (await dbPromise).put('user_data', { id: 'favorites', data: songIds });
+  },
+};

@@ -1,21 +1,23 @@
-/** @type {import('next').NextConfig} */
-const withPWA = require('next-pwa')({
+import withPWAInit from 'next-pwa';
+import type { NextConfig } from 'next';
+
+const withPWA = withPWAInit({
   dest: 'public',
   disable: process.env.NODE_ENV === 'development',
-  // This is crucial: Cache the Cloudinary domain for offline playback
   runtimeCaching: [
     {
       urlPattern: /^https:\/\/res\.cloudinary\.com\/.*/i,
       handler: 'CacheFirst',
       options: {
         cacheName: 'audio-cache',
-        expiration: { maxEntries: 200, maxAgeSeconds: 30 * 24 * 60 * 60 }, // 30 Days
+        expiration: { maxEntries: 200, maxAgeSeconds: 30 * 24 * 60 * 60 },
       },
     },
   ],
 });
 
-const nextConfig = {
+const nextConfig: NextConfig = {
+  turbopack: {},
   async headers() {
     return [
       {
@@ -29,4 +31,4 @@ const nextConfig = {
   },
 };
 
-module.exports = withPWA(nextConfig);
+export default withPWA(nextConfig as any);
