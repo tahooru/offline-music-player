@@ -7,9 +7,12 @@ import { Play, Pause, ChevronUp, Mic2, Shuffle, Repeat, SkipBack, SkipForward, H
 import { usePlayerStore } from "@/store/playerStore";
 import { buttonPressVariants, albumFloatVariants, trackChangeVariants } from "@/lib/animations";
 import { QueueDrawer } from "./QueueDrawer";
+import { FullScreenPlayer } from "./FullScreenPlayer";
+import { SongInfoModal } from "./SongInfoModal";
+import { MarqueeText } from "./MarqueeText";
 
 export function GlobalPlayer() {
-  const { currentSong, isPlaying, pause, resume, playNext, playPrevious, isShuffle, toggleShuffle, isLoop, toggleLoop } = usePlayerStore();
+  const { currentSong, isPlaying, pause, resume, playNext, playPrevious, isShuffle, toggleShuffle, isLoop, toggleLoop, favorites, toggleFavorite } = usePlayerStore();
   const pathname = usePathname();
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -18,6 +21,13 @@ export function GlobalPlayer() {
   const [volume, setVolume] = useState(1); // 0.0 to 1.0
   const [isMuted, setIsMuted] = useState(false);
   const [isQueueOpen, setIsQueueOpen] = useState(false);
+  const [isFullScreenOpen, setIsFullScreenOpen] = useState(false);
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
+
+  useEffect(() => {
+    setIsFullScreenOpen(false);
+    setIsInfoOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -72,7 +82,12 @@ export function GlobalPlayer() {
       animate={{ y: 0 }}
       exit={{ y: "100%" }}
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
-      className="fixed bottom-[68px] md:bottom-0 left-0 right-0 h-[64px] md:h-[90px] bg-light-pearl dark:bg-surface-cocoa border-t border-light-silver dark:border-surface-ash px-4 md:px-6 flex items-center justify-between z-40 shadow-[0_-4px_20px_rgba(0,0,0,0.1)]"
+      className="fixed bottom-[68px] md:bottom-0 left-0 right-0 h-[64px] md:h-[90px] bg-light-pearl dark:bg-surface-cocoa border-t border-light-silver dark:border-surface-ash px-4 md:px-6 flex items-center justify-between z-40 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] cursor-pointer"
+      onClick={(e) => {
+        // Prevent opening if clicking on controls
+        if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('.group\\/vol') || (e.target as HTMLElement).closest('.flex-1.h-1')) return;
+        setIsFullScreenOpen(true);
+      }}
     >
       {/* LEFT: Cover & Info */}
       <div className="flex-1 md:flex-none md:w-1/3 overflow-hidden pr-4">
@@ -97,9 +112,11 @@ export function GlobalPlayer() {
                 <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-bg-midnight absolute z-10" />
               )}
             </motion.div>
-            <div className="overflow-hidden flex flex-col justify-center">
-              <p className="text-label text-text-secondary dark:text-text-muted truncate">{currentSong.singers}</p>
-              <p className="text-track-title text-text-dark dark:text-text-white truncate -mt-0.5">{currentSong.title}</p>
+            <div className="overflow-hidden flex flex-col justify-center flex-1 min-w-0">
+              <MarqueeText className="text-track-title text-text-dark dark:text-text-white">{currentSong.title}</MarqueeText>
+              <MarqueeText className="text-label text-text-secondary dark:text-text-muted -mt-0.5">
+                {[currentSong.singers, currentSong.musician].filter(Boolean).join(", ")} {currentSong.album ? `- ${currentSong.album}` : ""}
+              </MarqueeText>
             </div>
           </motion.div>
         </AnimatePresence>
@@ -140,8 +157,14 @@ export function GlobalPlayer() {
             <SkipForward size={22} fill="currentColor" />
           </motion.button>
           
-          <motion.button variants={buttonPressVariants} initial="initial" whileTap="tap" className="text-text-muted hover:text-text-dark dark:hover:text-text-white transition-colors">
-            <Heart size={20} />
+          <motion.button 
+            variants={buttonPressVariants} 
+            initial="initial" 
+            whileTap="tap" 
+            onClick={(e) => { e.stopPropagation(); toggleFavorite(currentSong.id); }}
+            className={`transition-colors ${favorites.includes(currentSong.id) ? 'text-status-error' : 'text-text-muted hover:text-text-dark dark:hover:text-text-white'}`}
+          >
+            <Heart size={20} fill={favorites.includes(currentSong.id) ? 'currentColor' : 'none'} />
           </motion.button>
         </div>
         
@@ -204,11 +227,14 @@ export function GlobalPlayer() {
                 />
              </div>
           </div>
-          <button title="Queue" onClick={() => setIsQueueOpen(!isQueueOpen)} className={`${isQueueOpen ? 'text-primary' : 'hover:text-text-dark dark:hover:text-text-white'} transition-colors`}>
-             <ListMusic size={20} />
+          <button title="Queue" onClick={(e) => { e.stopPropagation(); setIsQueueOpen(!isQueueOpen); }} className={`flex items-center gap-1.5 text-xs font-bold ${isQueueOpen ? 'text-primary' : 'hover:text-text-dark dark:hover:text-text-white'} transition-colors`}>
+             <ListMusic size={16} /> Queue
           </button>
-          <button title="Full Screen Player">
-             <Maximize2 size={18} className="hover:text-text-dark dark:hover:text-text-white cursor-pointer transition-colors" />
+          <button title="More Info" onClick={(e) => { e.stopPropagation(); setIsInfoOpen(true); }} className="flex items-center gap-1.5 text-xs font-bold hover:text-text-dark dark:hover:text-text-white transition-colors">
+             More Info
+          </button>
+          <button title="Full Screen Player" onClick={(e) => { e.stopPropagation(); setIsFullScreenOpen(true); }}>
+             <Maximize2 size={16} className="hover:text-text-dark dark:hover:text-text-white cursor-pointer transition-colors" />
           </button>
         </div>
       </div>
@@ -224,6 +250,21 @@ export function GlobalPlayer() {
       
       {/* Modals & Overlays */}
       <QueueDrawer isOpen={isQueueOpen} onClose={() => setIsQueueOpen(false)} />
+      
+      <FullScreenPlayer 
+        isOpen={isFullScreenOpen} 
+        onClose={() => setIsFullScreenOpen(false)} 
+        audioRef={audioRef}
+        currentTime={currentTime}
+        duration={duration}
+        handleSeek={handleSeek}
+      />
+      
+      <SongInfoModal 
+        isOpen={isInfoOpen}
+        onClose={() => setIsInfoOpen(false)}
+        song={currentSong}
+      />
     </motion.footer>
   );
 }

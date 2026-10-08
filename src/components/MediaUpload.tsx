@@ -8,6 +8,7 @@ export function MediaUpload({ url, onUrlChange }: { url?: string, onUrlChange: (
   const [isCompressing, setIsCompressing] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
   const [inputUrl, setInputUrl] = useState("");
 
   const handleFileDrop = (e: React.DragEvent) => {
@@ -45,12 +46,31 @@ export function MediaUpload({ url, onUrlChange }: { url?: string, onUrlChange: (
     }
   };
 
-  const finishUpload = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      if (e.target?.result) onUrlChange(e.target.result as string);
-    };
-    reader.readAsDataURL(file);
+  const finishUpload = async (file: File) => {
+    setIsUploading(true);
+    useToastStore.getState().addToast("Uploading to Cloudinary...", "info");
+    
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (!res.ok) {
+        throw new Error("Failed to upload file to cloud.");
+      }
+      
+      const data = await res.json();
+      onUrlChange(data.secure_url);
+      useToastStore.getState().addToast("Successfully uploaded to cloud!", "success");
+    } catch (err: any) {
+      useToastStore.getState().addToast(err.message, "error");
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleUrlSubmit = async (e: React.FormEvent) => {
@@ -88,7 +108,7 @@ export function MediaUpload({ url, onUrlChange }: { url?: string, onUrlChange: (
     }
   };
 
-  const isLocalFile = url && url.startsWith('data:audio');
+  const isLocalFile = url && url.startsWith('http');
 
   return (
     <div className="space-y-3 col-span-1 md:col-span-2">
@@ -118,9 +138,15 @@ export function MediaUpload({ url, onUrlChange }: { url?: string, onUrlChange: (
              <p className="text-body font-bold text-text-dark dark:text-text-white mt-2">Click or Drop Music File Here</p>
              <p className="text-xs text-text-muted">Audio will be auto-compressed if &gt; 4MB</p>
              
-             {isLocalFile && (
+             {isUploading && (
+                <div className="mt-3 px-4 py-1.5 bg-brand-light/20 text-primary text-xs font-bold rounded-full absolute bottom-4 border border-brand-light/30 shadow-sm flex items-center gap-2">
+                   <Mic2 className="animate-spin" size={14} /> Uploading...
+                </div>
+             )}
+             
+             {isLocalFile && !isUploading && (
                 <div className="mt-3 px-4 py-1.5 bg-status-mint/20 text-status-success text-xs font-bold rounded-full absolute bottom-4 border border-status-mint/30 shadow-sm">
-                   Local File Added & Ready
+                   Cloud File Linked Successfully
                 </div>
              )}
           </div>

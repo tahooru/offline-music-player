@@ -23,16 +23,42 @@ export default function ArtistPage() {
   useEffect(() => {
     if (!id) return;
     const loadArtistData = async () => {
-      const singers = await db.getAllEntities("singers");
-      const foundArtist = singers.find(s => s.id === id);
-      if (!foundArtist) {
-        setIsLoading(false);
-        return;
-      }
-      setArtist(foundArtist);
+      // Check across all entity types for real profile
+      const [singers, musicians, lyricists] = await Promise.all([
+        db.getAllEntities("singers"),
+        db.getAllEntities("musicians"),
+        db.getAllEntities("lyricists")
+      ]);
+      const allEntities = [...singers, ...musicians, ...lyricists];
+      
+      const decodedId = decodeURIComponent(id).toLowerCase();
+      let foundArtist: Entity | undefined = allEntities.find(s => s.id === id || s.name.toLowerCase() === decodedId);
       
       const allSongs = await db.getAllSongs();
-      const artistSongs = allSongs.filter(s => s.singers?.toLowerCase().includes(foundArtist.name.toLowerCase()));
+      
+      // We must use foundArtist.name if it exists, otherwise use the decodedId
+      const searchName = foundArtist ? foundArtist.name.toLowerCase() : decodedId;
+      
+      const artistSongs = allSongs.filter(s => 
+         (s.singers && s.singers.toLowerCase().includes(searchName)) ||
+         (s.musician && s.musician.toLowerCase().includes(searchName))
+      );
+
+      if (!foundArtist) {
+        if (artistSongs.length > 0) {
+          // Virtual artist based on song metadata
+          foundArtist = {
+            id: decodedId,
+            name: decodeURIComponent(id),
+            photoUrl: ""
+          };
+        } else {
+          setIsLoading(false);
+          return;
+        }
+      }
+      
+      setArtist(foundArtist || null);
       setSongs(artistSongs);
       setIsLoading(false);
     };
@@ -146,7 +172,9 @@ export default function ArtistPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-body font-bold text-text-dark dark:text-text-white truncate group-hover:text-primary transition-colors">{song.title}</p>
-                  <p className="text-xs text-text-secondary dark:text-text-muted truncate">{song.album || "Single"}</p>
+                  <p className="text-xs text-text-secondary dark:text-text-muted truncate">
+                    {[song.singers, song.musician].filter(Boolean).join(", ")} {song.album ? `- ${song.album}` : ""}
+                  </p>
                 </div>
                 <div className="hidden sm:block text-sm text-text-muted px-4 truncate w-48 text-right">
                   {song.year || ""}

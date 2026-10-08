@@ -11,9 +11,10 @@ interface SmartDropdownProps {
   fetchOptions: () => Promise<string[]>;
   onCreateNew?: (name: string) => Promise<void>;
   placeholder?: string;
+  multiSelect?: boolean;
 }
 
-export function SmartDropdown({ label, value, onChange, fetchOptions, onCreateNew, placeholder }: SmartDropdownProps) {
+export function SmartDropdown({ label, value, onChange, fetchOptions, onCreateNew, placeholder, multiSelect }: SmartDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [options, setOptions] = useState<string[]>([]);
   const [search, setSearch] = useState("");
@@ -37,17 +38,34 @@ export function SmartDropdown({ label, value, onChange, fetchOptions, onCreateNe
   const filtered = options.filter(o => o.toLowerCase().includes(search.toLowerCase()));
   const exactMatch = filtered.some(o => o.toLowerCase() === search.toLowerCase());
 
+  const selectedValues = value ? value.split(',').map(v => v.trim()).filter(Boolean) : [];
+
   const handleSelect = (val: string) => {
-    onChange(val);
-    setIsOpen(false);
-    setSearch("");
+    if (multiSelect) {
+      if (selectedValues.includes(val)) {
+        onChange(selectedValues.filter(v => v !== val).join(', '));
+      } else {
+        onChange([...selectedValues, val].join(', '));
+      }
+      setSearch("");
+      // don't close if multiSelect
+    } else {
+      onChange(val);
+      setIsOpen(false);
+      setSearch("");
+    }
   };
 
   const handleCreate = async () => {
     if (onCreateNew && search && !exactMatch) {
       await onCreateNew(search);
-      onChange(search);
-      setIsOpen(false);
+      
+      if (multiSelect) {
+        onChange([...selectedValues, search].join(', '));
+      } else {
+        onChange(search);
+        setIsOpen(false);
+      }
       useToastStore.getState().addToast(`Created "${search}" dynamically!`, "success");
       setSearch("");
     }
@@ -57,11 +75,30 @@ export function SmartDropdown({ label, value, onChange, fetchOptions, onCreateNe
     <div className="relative" ref={dropdownRef}>
       <label className="block text-body text-text-dark dark:text-text-soft-white mb-1">{label}</label>
       <div 
-        className="w-full bg-light-pearl dark:bg-surface-cocoa border border-light-silver dark:border-surface-ash rounded-lg px-4 py-2.5 text-body text-text-dark dark:text-text-white cursor-pointer flex justify-between items-center transition-colors hover:border-primary"
+        className="w-full bg-light-pearl dark:bg-surface-cocoa border border-light-silver dark:border-surface-ash rounded-lg px-4 py-2.5 min-h-[46px] text-body text-text-dark dark:text-text-white cursor-pointer flex flex-wrap gap-2 items-center transition-colors hover:border-primary"
         onClick={() => setIsOpen(!isOpen)}
       >
-        <span className={value ? "" : "text-text-muted"}>{value || placeholder || "Select..."}</span>
-        <ChevronDown size={18} className="text-text-muted" />
+        {multiSelect && selectedValues.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5 flex-1">
+            {selectedValues.map(sv => (
+              <span key={sv} className="px-2 py-0.5 bg-primary/10 text-primary rounded text-xs font-bold flex items-center gap-1">
+                {sv}
+                <span 
+                  className="hover:text-status-error cursor-pointer pl-1"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onChange(selectedValues.filter(v => v !== sv).join(', '));
+                  }}
+                >
+                  &times;
+                </span>
+              </span>
+            ))}
+          </div>
+        ) : (
+          <span className={value ? "flex-1" : "flex-1 text-text-muted"}>{value || placeholder || "Select..."}</span>
+        )}
+        <ChevronDown size={18} className="text-text-muted flex-shrink-0" />
       </div>
 
       {isOpen && (
@@ -78,15 +115,18 @@ export function SmartDropdown({ label, value, onChange, fetchOptions, onCreateNe
             />
           </div>
           <div className="max-h-56 overflow-y-auto custom-scrollbar p-1">
-            {filtered.map(opt => (
-              <div 
-                key={opt} 
-                className="px-3 py-2 hover:bg-light-pearl dark:hover:bg-surface-cocoa rounded-lg cursor-pointer text-sm font-bold text-text-dark dark:text-text-white transition-colors"
-                onClick={() => handleSelect(opt)}
-              >
-                {opt}
-              </div>
-            ))}
+            {filtered.map(opt => {
+              const isSelected = multiSelect && selectedValues.includes(opt);
+              return (
+                <div 
+                  key={opt} 
+                  className={`px-3 py-2 hover:bg-light-pearl dark:hover:bg-surface-cocoa rounded-lg cursor-pointer text-sm font-bold transition-colors ${isSelected ? 'bg-primary/5 text-primary' : 'text-text-dark dark:text-text-white'}`}
+                  onClick={() => handleSelect(opt)}
+                >
+                  {opt} {isSelected && '✓'}
+                </div>
+              );
+            })}
             
             {!exactMatch && search && (
               <div 

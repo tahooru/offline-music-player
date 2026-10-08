@@ -19,6 +19,8 @@ interface PlayerState {
   queue: Song[];
   isShuffle: boolean;
   isLoop: boolean;
+  favorites: string[];
+  
   
   setIsPlaying: (playing: boolean) => void;
   playSong: (song: Song, queue?: Song[]) => void;
@@ -32,6 +34,7 @@ interface PlayerState {
   appendToQueue: (song: Song) => void;
   toggleShuffle: () => void;
   toggleLoop: () => void;
+  toggleFavorite: (songId: string) => void;
 }
 
 export const usePlayerStore = create<PlayerState>((set, get) => ({
@@ -40,6 +43,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   queue: [],
   isShuffle: false,
   isLoop: false,
+  favorites: typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('favorites') || '[]') : [],
 
   setIsPlaying: (playing) => set({ isPlaying: playing }),
   
@@ -73,6 +77,13 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
   toggleShuffle: () => set((state) => ({ isShuffle: !state.isShuffle })),
   toggleLoop: () => set((state) => ({ isLoop: !state.isLoop })),
+  
+  toggleFavorite: (songId) => set((state) => {
+    const isFav = state.favorites.includes(songId);
+    const newFavs = isFav ? state.favorites.filter(id => id !== songId) : [...state.favorites, songId];
+    if (typeof window !== 'undefined') localStorage.setItem('favorites', JSON.stringify(newFavs));
+    return { favorites: newFavs };
+  }),
 
   playNext: () => {
     const { queue, currentSong, isShuffle, isLoop } = get();

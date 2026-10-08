@@ -1,5 +1,6 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { Song } from '@/store/playerStore';
+import { supabase } from './supabase';
 
 export interface Album {
   id: string;
@@ -122,11 +123,29 @@ export const db = {
     if (!dbPromise) return;
     const database = await dbPromise;
     await database.put('songs', song);
+    
+    // Sync to Supabase
+    if (typeof window !== 'undefined') {
+      supabase.from('songs').upsert({
+        id: song.id,
+        title: song.title,
+        album: song.album,
+        singers: song.singers,
+        musician: song.musician,
+        year: song.year,
+        url: song.url,
+        "coverUrl": song.coverUrl,
+        language: song.language
+      }).then(({ error }) => { if (error) console.error("Supabase sync error:", error); });
+    }
   },
   async deleteSong(id: string): Promise<void> {
     if (!dbPromise) return;
     const database = await dbPromise;
     await database.delete('songs', id);
+    if (typeof window !== 'undefined') {
+      supabase.from('songs').delete().eq('id', id).then();
+    }
   },
 
   // --- Albums ---
@@ -137,10 +156,12 @@ export const db = {
   async putAlbum(album: Album): Promise<void> {
     if (!dbPromise) return;
     await (await dbPromise).put('albums', album);
+    if (typeof window !== 'undefined') supabase.from('albums').upsert(album).then();
   },
   async deleteAlbum(id: string): Promise<void> {
     if (!dbPromise) return;
     await (await dbPromise).delete('albums', id);
+    if (typeof window !== 'undefined') supabase.from('albums').delete().eq('id', id).then();
   },
 
   // --- Entities (Generic) ---
@@ -151,10 +172,16 @@ export const db = {
   async putEntity(storeName: 'singers' | 'lyricists' | 'musicians', entity: Entity): Promise<void> {
     if (!dbPromise) return;
     await (await dbPromise).put(storeName, entity);
+    if (typeof window !== 'undefined') {
+      supabase.from('entities').upsert({ ...entity, type: storeName }).then();
+    }
   },
   async deleteEntity(storeName: 'singers' | 'lyricists' | 'musicians', id: string): Promise<void> {
     if (!dbPromise) return;
     await (await dbPromise).delete(storeName, id);
+    if (typeof window !== 'undefined') {
+      supabase.from('entities').delete().eq('id', id).eq('type', storeName).then();
+    }
   },
 
   // --- Languages ---
@@ -165,10 +192,12 @@ export const db = {
   async putLanguage(language: Language): Promise<void> {
     if (!dbPromise) return;
     await (await dbPromise).put('languages', language);
+    if (typeof window !== 'undefined') supabase.from('languages').upsert(language).then();
   },
   async deleteLanguage(id: string): Promise<void> {
     if (!dbPromise) return;
     await (await dbPromise).delete('languages', id);
+    if (typeof window !== 'undefined') supabase.from('languages').delete().eq('id', id).then();
   },
 
   // --- Playlists ---
@@ -199,4 +228,51 @@ export const db = {
     if (!dbPromise) return;
     await (await dbPromise).put('user_data', { id: 'favorites', data: songIds });
   },
+
+  // --- Cloud Sync ---
+  async syncFromCloud(): Promise<void> {
+    if (!dbPromise || typeof window === 'undefined') return;
+    const database = await dbPromise;
+    
+    try {
+      const [{ data: songs }, { data: albums }, { data: entities }, { data: languages }] = await Promise.all([
+        supabase.from('songs').select('*'),
+        supabase.from('albums').select('*'),
+        supabase.from('entities').select('*'),
+        supabase.from('languages').select('*'),
+      ]);
+
+      if (songs) {
+        const tx = database.transaction('songs', 'readwrite');
+        for (const s of songs) tx.store.put(s as Song);
+        await tx.done;
+      }
+      
+      if (albums) {
+        const tx = database.transaction('albums', 'readwrite');
+        for (const a of albums) tx.store.put(a as Album);
+        await tx.done;
+      }
+
+      if (entities) {
+        const singersTx = database.transaction('singers', 'readwrite');
+        const lyricistsTx = database.transaction('lyricists', 'readwrite');
+        const musiciansTx = database.transaction('musicians', 'readwrite');
+        for (const e of entities) {
+          if (e.type === 'singers') singersTx.store.put({ id: e.id, name: e.name, photoUrl: e.photoUrl });
+          if (e.type === 'lyricists') lyricistsTx.store.put({ id: e.id, name: e.name, photoUrl: e.photoUrl });
+          if (e.type === 'musicians') musiciansTx.store.put({ id: e.id, name: e.name, photoUrl: e.photoUrl });
+        }
+        await Promise.all([singersTx.done, lyricistsTx.done, musiciansTx.done]);
+      }
+
+      if (languages) {
+        const tx = database.transaction('languages', 'readwrite');
+        for (const l of languages) tx.store.put(l as Language);
+        await tx.done;
+      }
+    } catch (e) {
+      console.error("Failed to sync from cloud", e);
+    }
+  }
 };

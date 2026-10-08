@@ -482,6 +482,7 @@ function SongsManager() {
                 placeholder="Select Singer..." 
                 fetchOptions={async () => (await db.getAllEntities("singers")).map(s => s.name)}
                 onCreateNew={async (name) => { await db.putEntity("singers", { id: Math.random().toString(36).substring(7), name, photoUrl: "" }) }}
+                multiSelect={true}
               />
               <SmartDropdown 
                 label="Language" 
