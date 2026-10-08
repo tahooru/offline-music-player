@@ -46,7 +46,7 @@ export function useAudioCompressor() {
     const data = fileData as Uint8Array;
     
     setIsCompressing(false);
-    return new Blob([data.buffer], { type: 'audio/mp3' });
+    return new Blob([data.buffer as ArrayBuffer], { type: 'audio/mp3' });
   }, [isReady, load]);
 
   return { compressAudio, isReady, load, isCompressing };
