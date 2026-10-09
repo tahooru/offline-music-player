@@ -21,8 +21,24 @@ export function SongActionMenu({ song, onChange }: { song: Song, onChange?: () =
     checkFavorite();
     if (isOpen) {
        loadPlaylists();
+       window.history.pushState({ isActionMenuOpen: true }, "");
+       const handlePopState = () => {
+         setIsOpen(false);
+         setShowPlaylists(false);
+       };
+       window.addEventListener("popstate", handlePopState);
+       return () => window.removeEventListener("popstate", handlePopState);
     }
   }, [isOpen]);
+
+  const handleClose = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setIsOpen(false);
+    setShowPlaylists(false);
+    if (window.history.state?.isActionMenuOpen) {
+      window.history.back();
+    }
+  };
 
   const checkFavorite = async () => {
     const favs = await db.getFavorites();
@@ -44,7 +60,7 @@ export function SongActionMenu({ song, onChange }: { song: Song, onChange?: () =
        addToast("Added to favourites!", "success");
     }
     setIsFavorite(!isFavorite);
-    setIsOpen(false);
+    handleClose();
     if (onChange) onChange();
   };
 
@@ -52,14 +68,14 @@ export function SongActionMenu({ song, onChange }: { song: Song, onChange?: () =
     e.stopPropagation();
     insertNext(song);
     addToast("Will play next", "info");
-    setIsOpen(false);
+    handleClose();
   };
 
   const handleAddToQueue = (e: React.MouseEvent) => {
     e.stopPropagation();
     appendToQueue(song);
     addToast("Added to queue", "info");
-    setIsOpen(false);
+    handleClose();
   };
 
   const handleAddToPlaylist = async (playlist: Playlist, e: React.MouseEvent) => {
@@ -70,15 +86,14 @@ export function SongActionMenu({ song, onChange }: { song: Song, onChange?: () =
        await db.putPlaylist({ ...playlist, songIds: [...playlist.songIds, song.id] });
        addToast(`Added to ${playlist.name}`, "success");
     }
-    setShowPlaylists(false);
-    setIsOpen(false);
+    handleClose();
     if (onChange) onChange();
   };
 
   return (
     <div className="relative">
       <button 
-        onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); setShowPlaylists(false); }}
+        onClick={(e) => { e.stopPropagation(); if(isOpen) handleClose(); else { setIsOpen(true); setShowPlaylists(false); } }}
         className="w-10 h-10 rounded-full flex items-center justify-center text-text-muted hover:bg-light-silver dark:hover:bg-surface-ash transition-colors md:opacity-0 md:group-hover:opacity-100 focus:opacity-100"
       >
         <MoreVertical size={20} />
@@ -86,7 +101,7 @@ export function SongActionMenu({ song, onChange }: { song: Song, onChange?: () =
 
       {isOpen && (
         <>
-          <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setIsOpen(false); }} />
+          <div className="fixed inset-0 z-40" onClick={handleClose} />
           <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-surface-graphite border border-light-silver dark:border-surface-ash rounded-xl shadow-xl z-50 py-2 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
             
             {showPlaylists ? (
@@ -128,7 +143,7 @@ export function SongActionMenu({ song, onChange }: { song: Song, onChange?: () =
                 <button onClick={handleAddToQueue} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-light-pearl dark:hover:bg-surface-cocoa transition-colors text-text-dark dark:text-text-white">
                   <PlusSquare size={16} className="text-text-muted" /> Add to Queue
                 </button>
-                <button onClick={(e) => { e.stopPropagation(); setShowInfo(true); setIsOpen(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-light-pearl dark:hover:bg-surface-cocoa transition-colors text-text-dark dark:text-text-white">
+                <button onClick={(e) => { e.stopPropagation(); setShowInfo(true); handleClose(); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-light-pearl dark:hover:bg-surface-cocoa transition-colors text-text-dark dark:text-text-white">
                   <Info size={16} className="text-text-muted" /> More Info
                 </button>
               </>

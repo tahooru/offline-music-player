@@ -57,16 +57,29 @@ export function FullScreenPlayer({
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  // Close full screen on Esc
+  // Close full screen on Esc and handle hardware back button
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") handleClose();
     };
     if (isOpen) {
       window.addEventListener("keydown", handleKeyDown);
+      window.history.pushState({ isFullScreenPlayerOpen: true }, "");
+      const handlePopState = () => onClose();
+      window.addEventListener("popstate", handlePopState);
+      return () => {
+        window.removeEventListener("keydown", handleKeyDown);
+        window.removeEventListener("popstate", handlePopState);
+      };
     }
-    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
+
+  const handleClose = () => {
+    onClose();
+    if (window.history.state?.isFullScreenPlayerOpen) {
+      window.history.back();
+    }
+  };
 
   if (!currentSong) return null;
 
@@ -103,7 +116,7 @@ export function FullScreenPlayer({
           {/* Top Bar (Mobile & Desktop) */}
           <header className="w-full max-w-7xl mx-auto flex items-center justify-between px-4 sm:px-6 pt-3 pb-2 flex-shrink-0 relative z-20">
             <button 
-              onClick={onClose} 
+              onClick={handleClose} 
               aria-label="Collapse player"
               className="p-2.5 bg-light-pearl/90 dark:bg-white/10 hover:bg-light-silver dark:hover:bg-white/20 rounded-full transition-colors flex items-center justify-center backdrop-blur-md border border-light-silver/50 dark:border-white/10 text-text-dark dark:text-white"
             >

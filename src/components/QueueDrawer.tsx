@@ -14,6 +14,22 @@ interface QueueDrawerProps {
 export function QueueDrawer({ isOpen, onClose }: QueueDrawerProps) {
   const { queue, currentSong, playSong, isPlaying } = usePlayerStore();
 
+  useEffect(() => {
+    if (isOpen) {
+      window.history.pushState({ isQueueDrawerOpen: true }, "");
+      const handlePopState = () => onClose();
+      window.addEventListener("popstate", handlePopState);
+      return () => window.removeEventListener("popstate", handlePopState);
+    }
+  }, [isOpen, onClose]);
+
+  const handleClose = () => {
+    onClose();
+    if (window.history.state?.isQueueDrawerOpen) {
+      window.history.back();
+    }
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -22,7 +38,7 @@ export function QueueDrawer({ isOpen, onClose }: QueueDrawerProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={onClose}
+            onClick={handleClose}
             className="fixed inset-0 bg-black/40 z-50 backdrop-blur-sm"
           />
           <motion.div
@@ -38,7 +54,7 @@ export function QueueDrawer({ isOpen, onClose }: QueueDrawerProps) {
                  <Music size={20} className="text-primary" /> Playing Next
               </h2>
               <button 
-                onClick={onClose}
+                onClick={handleClose}
                 className="w-8 h-8 flex items-center justify-center rounded-full bg-light-silver dark:bg-surface-ash text-text-muted hover:text-text-dark dark:hover:text-text-white transition-colors"
               >
                 <X size={16} />
