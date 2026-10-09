@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
+import { useEffect } from "react";
 import { usePlayerStore } from "@/store/playerStore";
 import { bottomSheetVariants, visualizerBarVariants } from "@/lib/animations";
 import { X, Play, Music } from "lucide-react";
