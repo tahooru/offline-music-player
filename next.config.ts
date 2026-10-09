@@ -13,6 +13,17 @@ const withPWA = withPWAInit({
         expiration: { maxEntries: 200, maxAgeSeconds: 30 * 24 * 60 * 60 },
       },
     },
+    {
+      urlPattern: /^https:\/\/brswwekbxrklbdoitxgv\.supabase\.co\/.*/i,
+      handler: 'CacheFirst',
+      options: {
+        cacheName: 'supabase-media-cache',
+        expiration: { maxEntries: 500, maxAgeSeconds: 30 * 24 * 60 * 60 },
+        cacheableResponse: {
+          statuses: [0, 200],
+        },
+      },
+    },
   ],
 });
 
