@@ -49,7 +49,9 @@ export async function POST(req: NextRequest) {
 
     // Fallback to data URL only if Cloudinary is unavailable
     const base64 = buffer.toString('base64');
-    const dataUrl = `data:${file.type || (isImage ? 'image/jpeg' : 'audio/mpeg')};base64,${base64}`;
+    const rawType = file.type || (isImage ? 'image/jpeg' : 'audio/mpeg');
+    const finalType = rawType.split(';')[0].trim();
+    const dataUrl = `data:${finalType};base64,${base64}`;
 
     return NextResponse.json({
       secure_url: dataUrl,

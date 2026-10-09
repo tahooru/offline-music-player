@@ -63,7 +63,8 @@ export async function POST(req: NextRequest) {
     }
 
     const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
-    const finalContentType = imageRes.headers.get('content-type') || 'image/jpeg';
+    const rawContentType = imageRes.headers.get('content-type') || 'image/jpeg';
+    const finalContentType = rawContentType.split(';')[0].trim();
 
     // 5. Attempt Cloudinary upload
     try {
