@@ -51,21 +51,41 @@ export function MediaUpload({ url, onUrlChange }: { url?: string, onUrlChange: (
     useToastStore.getState().addToast("Uploading to Cloudinary...", "info");
     
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData
-      });
-      
-      if (!res.ok) {
-        throw new Error("Failed to upload file to cloud.");
+      if (file.size > 4.5 * 1024 * 1024) {
+        // Vercel limit is 4.5MB - process locally to bypass
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        onUrlChange(dataUrl);
+        useToastStore.getState().addToast("File processed locally (bypassed cloud limit)!", "success");
+      } else {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (!res.ok) {
+          // Fallback to local
+          const dataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+          onUrlChange(dataUrl);
+          useToastStore.getState().addToast("Fallback: file processed locally!", "success");
+        } else {
+          const data = await res.json();
+          onUrlChange(data.secure_url);
+          useToastStore.getState().addToast("Successfully uploaded to cloud!", "success");
+        }
       }
-      
-      const data = await res.json();
-      onUrlChange(data.secure_url);
-      useToastStore.getState().addToast("Successfully uploaded to cloud!", "success");
     } catch (err: any) {
       useToastStore.getState().addToast(err.message, "error");
     } finally {
