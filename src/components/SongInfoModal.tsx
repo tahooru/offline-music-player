@@ -18,11 +18,41 @@ export function SongInfoModal({ isOpen, onClose, song }: SongInfoModalProps) {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") handleClose();
     };
-    if (isOpen) window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    if (isOpen) {
+      window.addEventListener("keydown", handleKeyDown);
+      window.history.pushState({ isSongInfoModal: true }, "");
+      
+      const handlePopState = () => {
+        onClose();
+      };
+      window.addEventListener("popstate", handlePopState);
+      
+      return () => {
+        window.removeEventListener("keydown", handleKeyDown);
+        window.removeEventListener("popstate", handlePopState);
+      };
+    }
   }, [isOpen, onClose]);
+
+  const handleClose = () => {
+    onClose();
+    if (window.history.state?.isSongInfoModal) {
+      window.history.back();
+    }
+  };
+
+  const handleNavigate = (path: string) => {
+    onClose();
+    if (window.history.state?.isSongInfoModal) {
+      window.history.back();
+    }
+    setTimeout(() => {
+      usePlayerStore.getState().closeFullScreen();
+      router.push(path);
+    }, 10);
+  };
 
   if (!song) return null;
 
@@ -46,7 +76,7 @@ export function SongInfoModal({ isOpen, onClose, song }: SongInfoModalProps) {
              initial={{ opacity: 0 }}
              animate={{ opacity: 1 }}
              exit={{ opacity: 0 }}
-             onClick={(e) => { e.stopPropagation(); onClose(); }}
+             onClick={(e) => { e.stopPropagation(); handleClose(); }}
              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
           />
           <motion.div
@@ -59,7 +89,7 @@ export function SongInfoModal({ isOpen, onClose, song }: SongInfoModalProps) {
           >
              <div className="flex items-center justify-between p-6 border-b border-light-silver dark:border-surface-ash bg-light-pearl dark:bg-surface-cocoa">
                <h3 className="text-section-heading text-text-dark dark:text-text-white">More Info</h3>
-               <button onClick={onClose} className="p-2 -mr-2 text-text-muted hover:text-text-dark dark:hover:text-text-white transition-colors rounded-full hover:bg-light-silver dark:hover:bg-surface-ash">
+               <button onClick={handleClose} className="p-2 -mr-2 text-text-muted hover:text-text-dark dark:hover:text-text-white transition-colors rounded-full hover:bg-light-silver dark:hover:bg-surface-ash">
                  <X size={20} />
                </button>
              </div>
@@ -76,9 +106,7 @@ export function SongInfoModal({ isOpen, onClose, song }: SongInfoModalProps) {
                             key={i} 
                             onClick={(e) => {
                                e.stopPropagation();
-                               onClose();
-                               usePlayerStore.getState().closeFullScreen();
-                               router.push(`/artist/${encodeURIComponent(name)}`);
+                               handleNavigate(`/artist/${encodeURIComponent(name)}`);
                             }}
                             className="flex items-center justify-between p-3 -mx-3 hover:bg-light-silver/50 dark:hover:bg-white/5 rounded-xl transition-colors group cursor-pointer border-b border-light-silver/30 dark:border-white/5 last:border-0"
                           >
@@ -110,9 +138,7 @@ export function SongInfoModal({ isOpen, onClose, song }: SongInfoModalProps) {
                             key={i} 
                             onClick={(e) => {
                                e.stopPropagation();
-                               onClose();
-                               usePlayerStore.getState().closeFullScreen();
-                               router.push(`/artist/${encodeURIComponent(name)}`);
+                               handleNavigate(`/artist/${encodeURIComponent(name)}`);
                             }}
                             className="flex items-center justify-between p-3 -mx-3 hover:bg-light-silver/50 dark:hover:bg-white/5 rounded-xl transition-colors group cursor-pointer border-b border-light-silver/30 dark:border-white/5 last:border-0"
                           >
@@ -144,9 +170,7 @@ export function SongInfoModal({ isOpen, onClose, song }: SongInfoModalProps) {
                             key={i} 
                             onClick={(e) => {
                                e.stopPropagation();
-                               onClose();
-                               usePlayerStore.getState().closeFullScreen();
-                               router.push(`/artist/${encodeURIComponent(name)}`);
+                               handleNavigate(`/artist/${encodeURIComponent(name)}`);
                             }}
                             className="flex items-center justify-between p-3 -mx-3 hover:bg-light-silver/50 dark:hover:bg-white/5 rounded-xl transition-colors group cursor-pointer border-b border-light-silver/30 dark:border-white/5 last:border-0"
                           >
@@ -176,9 +200,7 @@ export function SongInfoModal({ isOpen, onClose, song }: SongInfoModalProps) {
                         <div 
                           onClick={(e) => {
                              e.stopPropagation();
-                             onClose();
-                             usePlayerStore.getState().closeFullScreen();
-                             router.push(`/album/${encodeURIComponent(song.album)}`);
+                             handleNavigate(`/album/${encodeURIComponent(song.album)}`);
                           }}
                           className="flex items-center justify-between p-3 -mx-3 hover:bg-light-silver/50 dark:hover:bg-white/5 rounded-xl transition-colors group cursor-pointer border-b border-light-silver/30 dark:border-white/5 last:border-0"
                         >

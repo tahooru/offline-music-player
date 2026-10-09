@@ -403,13 +403,33 @@ function SongsManager() {
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isAdding) {
-        setIsAdding(false);
-        setFormData({});
+        handleClose();
       }
     };
-    window.addEventListener("keydown", handleGlobalKeyDown);
-    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+    if (isAdding) {
+      window.addEventListener("keydown", handleGlobalKeyDown);
+      window.history.pushState({ isAdminAdding: true }, "");
+      
+      const handlePopState = () => {
+        setIsAdding(false);
+        setFormData({});
+      };
+      window.addEventListener("popstate", handlePopState);
+      
+      return () => {
+        window.removeEventListener("keydown", handleGlobalKeyDown);
+        window.removeEventListener("popstate", handlePopState);
+      };
+    }
   }, [isAdding]);
+
+  const handleClose = () => {
+    setIsAdding(false);
+    setFormData({});
+    if (window.history.state?.isAdminAdding) {
+      window.history.back();
+    }
+  };
 
   const loadSongs = async () => setSongs(await db.getAllSongs());
 
@@ -502,10 +522,9 @@ function SongsManager() {
       }
     }
 
-    setFormData({});
-    setIsAdding(false);
     loadSongs();
     useToastStore.getState().addToast(isUpdating ? "Song updated successfully" : "New song added successfully", "success");
+    handleClose();
   };
 
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
@@ -527,7 +546,7 @@ function SongsManager() {
   if (isAdding) {
     return (
       <section className="bg-white dark:bg-surface-graphite rounded-2xl p-6 md:p-8 border border-light-silver dark:border-surface-ash shadow-sm relative">
-        <button onClick={() => { setIsAdding(false); setFormData({}); }} className="absolute top-6 right-6 md:top-8 md:right-8 text-text-muted hover:text-text-dark dark:hover:text-text-white transition-colors flex items-center gap-2 text-sm font-bold">
+        <button onClick={handleClose} className="absolute top-6 right-6 md:top-8 md:right-8 text-text-muted hover:text-text-dark dark:hover:text-text-white transition-colors flex items-center gap-2 text-sm font-bold">
           <ArrowLeft size={16} /> Back to List (Esc)
         </button>
         
@@ -682,13 +701,33 @@ function AlbumsManager() {
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isAdding) {
-        setIsAdding(false);
-        setFormData({});
+        handleClose();
       }
     };
-    window.addEventListener("keydown", handleGlobalKeyDown);
-    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+    if (isAdding) {
+      window.addEventListener("keydown", handleGlobalKeyDown);
+      window.history.pushState({ isAdminAdding: true }, "");
+      
+      const handlePopState = () => {
+        setIsAdding(false);
+        setFormData({});
+      };
+      window.addEventListener("popstate", handlePopState);
+      
+      return () => {
+        window.removeEventListener("keydown", handleGlobalKeyDown);
+        window.removeEventListener("popstate", handlePopState);
+      };
+    }
   }, [isAdding]);
+
+  const handleClose = () => {
+    setIsAdding(false);
+    setFormData({});
+    if (window.history.state?.isAdminAdding) {
+      window.history.back();
+    }
+  };
 
   const loadAlbums = async () => setAlbums(await db.getAllAlbums());
 
@@ -722,10 +761,9 @@ function AlbumsManager() {
       }
     }
 
-    setFormData({});
-    setIsAdding(false);
     loadAlbums();
     useToastStore.getState().addToast(isUpdating ? "Album updated successfully" : "New album added successfully", "success");
+    handleClose();
   };
 
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
@@ -747,7 +785,7 @@ function AlbumsManager() {
   if (isAdding) {
     return (
       <section className="bg-white dark:bg-surface-graphite rounded-2xl p-6 md:p-8 border border-light-silver dark:border-surface-ash shadow-sm relative">
-        <button onClick={() => { setIsAdding(false); setFormData({}); }} className="absolute top-6 right-6 md:top-8 md:right-8 text-text-muted hover:text-text-dark dark:hover:text-text-white transition-colors flex items-center gap-2 text-sm font-bold">
+        <button onClick={handleClose} className="absolute top-6 right-6 md:top-8 md:right-8 text-text-muted hover:text-text-dark dark:hover:text-text-white transition-colors flex items-center gap-2 text-sm font-bold">
           <ArrowLeft size={16} /> Back to List (Esc)
         </button>
         <h2 className="text-section-heading mb-6 flex items-center gap-2 text-text-dark dark:text-text-white border-b border-light-silver dark:border-surface-ash pb-4">
@@ -837,13 +875,33 @@ function EntityManager({ title, entityName, icon }: { title: string, entityName:
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isAdding) {
-        setIsAdding(false);
-        setFormData({});
+        handleClose();
       }
     };
-    window.addEventListener("keydown", handleGlobalKeyDown);
-    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+    if (isAdding) {
+      window.addEventListener("keydown", handleGlobalKeyDown);
+      window.history.pushState({ isAdminAdding: true }, "");
+      
+      const handlePopState = () => {
+        setIsAdding(false);
+        setFormData({});
+      };
+      window.addEventListener("popstate", handlePopState);
+      
+      return () => {
+        window.removeEventListener("keydown", handleGlobalKeyDown);
+        window.removeEventListener("popstate", handlePopState);
+      };
+    }
   }, [isAdding]);
+
+  const handleClose = () => {
+    setIsAdding(false);
+    setFormData({});
+    if (window.history.state?.isAdminAdding) {
+      window.history.back();
+    }
+  };
 
   const loadEntities = async () => setEntities(await db.getAllEntities(entityName));
 
@@ -859,10 +917,9 @@ function EntityManager({ title, entityName, icon }: { title: string, entityName:
       name: formData.name,
       photoUrl: formData.photoUrl || "",
     });
-    setFormData({});
-    setIsAdding(false);
     loadEntities();
     useToastStore.getState().addToast(isUpdating ? "Entry updated successfully" : "New entry added successfully", "success");
+    handleClose();
   };
 
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
@@ -884,7 +941,7 @@ function EntityManager({ title, entityName, icon }: { title: string, entityName:
   if (isAdding) {
     return (
       <section className="bg-white dark:bg-surface-graphite rounded-2xl p-6 md:p-8 border border-light-silver dark:border-surface-ash shadow-sm relative">
-        <button onClick={() => { setIsAdding(false); setFormData({}); }} className="absolute top-6 right-6 md:top-8 md:right-8 text-text-muted hover:text-text-dark dark:hover:text-text-white transition-colors flex items-center gap-2 text-sm font-bold">
+        <button onClick={handleClose} className="absolute top-6 right-6 md:top-8 md:right-8 text-text-muted hover:text-text-dark dark:hover:text-text-white transition-colors flex items-center gap-2 text-sm font-bold">
           <ArrowLeft size={16} /> Back to List (Esc)
         </button>
         <h2 className="text-section-heading mb-6 flex items-center gap-2 text-text-dark dark:text-text-white border-b border-light-silver dark:border-surface-ash pb-4">
