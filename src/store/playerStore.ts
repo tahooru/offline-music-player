@@ -12,6 +12,7 @@ export interface Song {
   language?: string;
   lyricist?: string;
   duration?: number;
+  createdAt?: number;
 }
 
 interface PlayerState {
