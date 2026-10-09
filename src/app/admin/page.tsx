@@ -839,7 +839,13 @@ function AlbumsManager() {
                 title="Select row and press F2 to Edit, Delete to Remove"
               >
                 <td className="py-3 px-4 text-body text-text-dark dark:text-text-white font-bold flex items-center gap-3">
-                  <img src={album.cover || 'https://via.placeholder.com/40'} alt="" className="w-10 h-10 bg-light-silver rounded object-cover" />
+                  {album.cover ? (
+                    <img src={album.cover} alt="" className="w-10 h-10 bg-light-silver rounded object-cover" />
+                  ) : (
+                    <div className="w-10 h-10 bg-light-silver dark:bg-surface-ash rounded flex items-center justify-center flex-shrink-0">
+                      <Disc size={20} className="text-text-muted" />
+                    </div>
+                  )}
                   {album.name}
                 </td>
                 <td className="py-3 px-4 text-body text-text-secondary dark:text-text-muted hidden sm:table-cell">{album.year}</td>
@@ -993,7 +999,13 @@ function EntityManager({ title, entityName, icon }: { title: string, entityName:
                 title="Select row and press F2 to Edit, Delete to Remove"
               >
                 <td className="py-3 px-4 text-body text-text-dark dark:text-text-white font-bold flex items-center gap-3">
-                  <img src={item.photoUrl || 'https://via.placeholder.com/40'} alt="" className="w-10 h-10 bg-light-silver rounded-full object-cover" />
+                  {item.photoUrl ? (
+                    <img src={item.photoUrl} alt="" className="w-10 h-10 bg-light-silver rounded-full object-cover" />
+                  ) : (
+                    <div className="w-10 h-10 bg-light-silver dark:bg-surface-ash rounded-full flex items-center justify-center flex-shrink-0">
+                      <UserCircle size={20} className="text-text-muted" />
+                    </div>
+                  )}
                   {item.name}
                 </td>
                 <td className="py-3 px-4 text-right space-x-3">

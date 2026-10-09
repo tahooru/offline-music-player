@@ -74,7 +74,13 @@ export function QueueDrawer({ isOpen, onClose }: QueueDrawerProps) {
                     className={`flex items-center gap-4 p-3 rounded-xl group cursor-pointer transition-colors border ${isCurrent ? 'bg-primary/10 border-primary/20 dark:bg-primary/20 dark:border-primary/30' : 'border-transparent hover:bg-light-pearl dark:hover:bg-surface-cocoa hover:border-light-silver dark:hover:border-surface-ash'}`}
                   >
                     <div className="w-12 h-12 rounded-lg bg-light-silver dark:bg-surface-ash overflow-hidden flex-shrink-0 relative">
-                      <img src={song.coverUrl || 'https://via.placeholder.com/48'} alt="" className={`w-full h-full object-cover transition-opacity ${!isCurrent && 'group-hover:opacity-50'}`} />
+                      {song.coverUrl ? (
+                        <img src={song.coverUrl} alt="" className={`w-full h-full object-cover transition-opacity ${!isCurrent && 'group-hover:opacity-50'}`} />
+                      ) : (
+                        <div className={`w-full h-full bg-light-silver dark:bg-surface-ash flex items-center justify-center transition-opacity ${!isCurrent && 'group-hover:opacity-50'}`}>
+                          <Music size={24} className="text-text-muted" />
+                        </div>
+                      )}
                       
                       {isCurrent ? (
                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center gap-0.5">
