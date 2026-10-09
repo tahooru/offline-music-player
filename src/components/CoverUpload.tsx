@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Download, Upload, Image as ImageIcon, X, Loader2, CheckCircle2 } from "lucide-react";
 import { useToastStore } from "@/store/toastStore";
 
@@ -21,6 +21,10 @@ export function CoverUpload({
   const [isDownloading, setIsDownloading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [previewError, setPreviewError] = useState(false);
+
+  useEffect(() => {
+    setPreviewError(false);
+  }, [value]);
 
   // Download cover from link via backend API
   const handleDownloadFromLink = async (e?: React.FormEvent) => {
@@ -73,24 +77,43 @@ export function CoverUpload({
       setIsUploading(true);
       useToastStore.getState().addToast("Uploading cover photo...", "info");
 
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("folder", "ttune_covers");
+      if (file.size > 4.5 * 1024 * 1024) {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        setPreviewError(false);
+        onChange(dataUrl);
+        useToastStore.getState().addToast("Cover processed locally!", "success");
+      } else {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("folder", "ttune_covers");
 
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
+        const res = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
 
-      const data = await res.json();
-
-      if (!res.ok || !data.secure_url) {
-        throw new Error(data.error || "Failed to upload image file.");
+        if (!res.ok) {
+          const dataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+          setPreviewError(false);
+          onChange(dataUrl);
+          useToastStore.getState().addToast("Fallback: cover processed locally!", "success");
+        } else {
+          const data = await res.json();
+          setPreviewError(false);
+          onChange(data.secure_url);
+          useToastStore.getState().addToast("Cover photo uploaded successfully!", "success");
+        }
       }
-
-      setPreviewError(false);
-      onChange(data.secure_url);
-      useToastStore.getState().addToast("Cover photo uploaded successfully!", "success");
     } catch (err: any) {
       console.error("File upload error:", err);
       useToastStore.getState().addToast(err.message || "Failed to upload image.", "error");
@@ -118,27 +141,28 @@ export function CoverUpload({
           {/* Live Preview Thumbnail */}
           <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl bg-light-silver dark:bg-surface-ash overflow-hidden flex-shrink-0 relative border border-light-silver/50 dark:border-white/10 shadow-sm flex items-center justify-center group">
             {value && !previewError ? (
-              <>
-                <img 
-                  src={value} 
-                  alt="Cover Preview" 
-                  onError={() => setPreviewError(true)}
-                  className="w-full h-full object-cover" 
-                />
-                <button
-                  type="button"
-                  onClick={handleClear}
-                  title="Remove Cover"
-                  className="absolute top-1 right-1 p-1 bg-black/60 hover:bg-black/90 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <X size={14} />
-                </button>
-              </>
+              <img 
+                src={value} 
+                alt="Cover Preview" 
+                onError={() => setPreviewError(true)}
+                className="w-full h-full object-cover" 
+              />
             ) : (
               <div className="flex flex-col items-center justify-center text-text-muted text-center p-2">
                 <ImageIcon size={28} className="mb-1 opacity-50" />
                 <span className="text-[10px] font-bold uppercase tracking-wider">No Cover</span>
               </div>
+            )}
+
+            {value && (
+              <button
+                type="button"
+                onClick={handleClear}
+                title="Remove Cover"
+                className="absolute top-1 right-1 p-1 bg-black/60 hover:bg-black/90 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
+              >
+                <X size={14} />
+              </button>
             )}
 
             {(isDownloading || isUploading) && (
@@ -153,7 +177,7 @@ export function CoverUpload({
           <div className="flex-1 w-full space-y-2">
             
             {/* 1. Download from Link */}
-            <form onSubmit={handleDownloadFromLink} className="flex gap-2">
+            <div className="flex gap-2">
               <input
                 type="text"
                 placeholder={placeholder}
@@ -163,7 +187,8 @@ export function CoverUpload({
                 className="flex-1 bg-white dark:bg-surface-graphite border border-light-silver dark:border-surface-ash rounded-lg px-3 py-2 text-sm text-text-dark dark:text-text-white focus:outline-none focus:ring-2 focus:ring-primary transition-all disabled:opacity-50"
               />
               <button
-                type="submit"
+                type="button"
+                onClick={handleDownloadFromLink}
                 disabled={!inputUrl || isDownloading || isUploading}
                 className="px-3.5 py-2 bg-primary text-text-white rounded-lg text-xs font-bold hover:bg-brand-dark transition-colors disabled:opacity-50 flex items-center gap-1.5 flex-shrink-0 shadow-sm"
               >
@@ -177,7 +202,7 @@ export function CoverUpload({
                   </>
                 )}
               </button>
-            </form>
+            </div>
 
             {/* 2. File Upload & Status info */}
             <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-light-silver/50 dark:border-surface-ash/50 text-xs text-text-secondary dark:text-text-muted">
