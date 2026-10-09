@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Download, Mic2 } from "lucide-react";
 import { useToastStore } from "@/store/toastStore";
+import { supabase } from "@/lib/supabase";
 
 export function MediaUpload({ url, onUrlChange }: { url?: string, onUrlChange: (u: string) => void }) {
   const [isCompressing, setIsCompressing] = useState(false);
@@ -51,41 +52,27 @@ export function MediaUpload({ url, onUrlChange }: { url?: string, onUrlChange: (
     useToastStore.getState().addToast("Uploading to Cloudinary...", "info");
     
     try {
-      if (file.size > 4.5 * 1024 * 1024) {
-        // Vercel limit is 4.5MB - process locally to bypass
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `audio/${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+      
+      const { data, error } = await supabase.storage
+        .from('ttune_media')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
         });
-        onUrlChange(dataUrl);
-        useToastStore.getState().addToast("File processed locally (bypassed cloud limit)!", "success");
-      } else {
-        const formData = new FormData();
-        formData.append('file', file);
-        
-        const res = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData
-        });
-        
-        if (!res.ok) {
-          // Fallback to local
-          const dataUrl = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-          });
-          onUrlChange(dataUrl);
-          useToastStore.getState().addToast("Fallback: file processed locally!", "success");
-        } else {
-          const data = await res.json();
-          onUrlChange(data.secure_url);
-          useToastStore.getState().addToast("Successfully uploaded to cloud!", "success");
-        }
+
+      if (error) {
+        throw error;
       }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('ttune_media')
+        .getPublicUrl(fileName);
+
+      onUrlChange(publicUrl);
+      useToastStore.getState().addToast("Successfully uploaded to cloud!", "success");
     } catch (err: any) {
       useToastStore.getState().addToast(err.message, "error");
     } finally {

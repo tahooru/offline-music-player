@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Download, Upload, Image as ImageIcon, X, Loader2, CheckCircle2 } from "lucide-react";
 import { useToastStore } from "@/store/toastStore";
+import { supabase } from "@/lib/supabase";
 
 interface CoverUploadProps {
   value?: string;
@@ -77,43 +78,29 @@ export function CoverUpload({
       setIsUploading(true);
       useToastStore.getState().addToast("Uploading cover photo...", "info");
 
-      if (file.size > 4.5 * 1024 * 1024) {
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
-        setPreviewError(false);
-        onChange(dataUrl);
-        useToastStore.getState().addToast("Cover processed locally!", "success");
-      } else {
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("folder", "ttune_covers");
-
-        const res = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
+      // Upload to Supabase Storage bucket 'ttune_media'
+      const fileExt = file.name.split('.').pop();
+      const fileName = `covers/${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+      
+      const { data, error } = await supabase.storage
+        .from('ttune_media')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
         });
 
-        if (!res.ok) {
-          const dataUrl = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-          });
-          setPreviewError(false);
-          onChange(dataUrl);
-          useToastStore.getState().addToast("Fallback: cover processed locally!", "success");
-        } else {
-          const data = await res.json();
-          setPreviewError(false);
-          onChange(data.secure_url);
-          useToastStore.getState().addToast("Cover photo uploaded successfully!", "success");
-        }
+      if (error) {
+        throw error;
       }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('ttune_media')
+        .getPublicUrl(fileName);
+
+      setPreviewError(false);
+      onChange(publicUrl);
+      useToastStore.getState().addToast("Cover uploaded successfully!", "success");
     } catch (err: any) {
       console.error("File upload error:", err);
       useToastStore.getState().addToast(err.message || "Failed to upload image.", "error");
