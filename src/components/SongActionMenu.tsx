@@ -1,16 +1,18 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { MoreVertical, Heart, ListPlus, PlaySquare, PlusSquare, X } from "lucide-react";
+import { MoreVertical, Heart, ListPlus, PlaySquare, PlusSquare, X, Info } from "lucide-react";
 import { Song, usePlayerStore } from "@/store/playerStore";
 import { useToastStore } from "@/store/toastStore";
 import { db, Playlist } from "@/lib/db";
+import { SongInfoModal } from "@/components/SongInfoModal";
 
 export function SongActionMenu({ song, onChange }: { song: Song, onChange?: () => void }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [showPlaylists, setShowPlaylists] = useState(false);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [showInfo, setShowInfo] = useState(false);
   
   const { insertNext, appendToQueue } = usePlayerStore();
   const { addToast } = useToastStore();
@@ -77,7 +79,7 @@ export function SongActionMenu({ song, onChange }: { song: Song, onChange?: () =
     <div className="relative">
       <button 
         onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); setShowPlaylists(false); }}
-        className="w-10 h-10 rounded-full flex items-center justify-center text-text-muted hover:bg-light-silver dark:hover:bg-surface-ash transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+        className="w-10 h-10 rounded-full flex items-center justify-center text-text-muted hover:bg-light-silver dark:hover:bg-surface-ash transition-colors md:opacity-0 md:group-hover:opacity-100 focus:opacity-100"
       >
         <MoreVertical size={20} />
       </button>
@@ -126,10 +128,21 @@ export function SongActionMenu({ song, onChange }: { song: Song, onChange?: () =
                 <button onClick={handleAddToQueue} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-light-pearl dark:hover:bg-surface-cocoa transition-colors text-text-dark dark:text-text-white">
                   <PlusSquare size={16} className="text-text-muted" /> Add to Queue
                 </button>
+                <button onClick={(e) => { e.stopPropagation(); setShowInfo(true); setIsOpen(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-light-pearl dark:hover:bg-surface-cocoa transition-colors text-text-dark dark:text-text-white">
+                  <Info size={16} className="text-text-muted" /> More Info
+                </button>
               </>
             )}
           </div>
         </>
+      )}
+
+      {showInfo && (
+        <SongInfoModal 
+          isOpen={showInfo}
+          onClose={() => setShowInfo(false)}
+          song={song}
+        />
       )}
     </div>
   );

@@ -87,16 +87,12 @@
   --font-sans: var(--font-pt-sans-narrow), Arial, Helvetica, sans-serif;
 }
 
-:root {
-  --background: var(--color-bg-midnight);
-  --foreground: var(--color-text-white);
-}
+/* Disable dark mode globally by setting the dark variant to a never-used class */
+@custom-variant dark (&:is(.dark-mode-disabled *));
 
-@media (prefers-color-scheme: light) {
-  :root {
-    --background: var(--color-light-ivory);
-    --foreground: var(--color-text-dark);
-  }
+:root {
+  --background: var(--color-light-ivory);
+  --foreground: var(--color-text-dark);
 }
 
 body {

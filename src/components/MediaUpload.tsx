@@ -86,21 +86,18 @@ export function MediaUpload({ url, onUrlChange }: { url?: string, onUrlChange: (
         body: JSON.stringify({ url: inputUrl })
       });
       
+      const data = await res.json();
       if (!res.ok) {
-         const data = await res.json().catch(()=>({}));
-         throw new Error(data.error || "Failed to download audio from this link.");
+        throw new Error(data.error || "Failed to download audio from this link.");
       }
       
-      const blob = await res.blob();
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        if (e.target?.result) {
-           onUrlChange(e.target.result as string);
-           useToastStore.getState().addToast("Song successfully extracted and saved locally!", "success");
-        }
-      };
-      reader.readAsDataURL(blob);
-      setInputUrl("");
+      if (data.url) {
+        onUrlChange(data.url);
+        useToastStore.getState().addToast("Song audio linked and ready!", "success");
+        setInputUrl("");
+      } else {
+        throw new Error("No audio stream received from link.");
+      }
     } catch (err: any) {
       useToastStore.getState().addToast(err.message, "error");
     } finally {

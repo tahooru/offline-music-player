@@ -18,6 +18,12 @@ export default function LibraryPage() {
 
   useEffect(() => {
     loadData();
+    window.addEventListener('database-synced', loadData);
+    window.addEventListener('database-updated', loadData);
+    return () => {
+      window.removeEventListener('database-synced', loadData);
+      window.removeEventListener('database-updated', loadData);
+    };
   }, []);
 
   const loadData = async () => {
@@ -129,7 +135,12 @@ export default function LibraryPage() {
                   {index + 1}
                 </div>
                 <div className="w-12 h-12 rounded-lg bg-light-silver dark:bg-surface-ash overflow-hidden flex-shrink-0 relative">
-                  <img src={song.coverUrl || 'https://via.placeholder.com/48'} alt="" className="w-full h-full object-cover group-hover:opacity-50 transition-opacity" />
+                  <img 
+                    src={song.coverUrl || 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=100&q=80'} 
+                    alt={song.title} 
+                    onError={(e) => { (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=100&q=80"; }}
+                    className="w-full h-full object-cover group-hover:opacity-50 transition-opacity" 
+                  />
                   <Play size={20} className="absolute inset-0 m-auto text-white opacity-0 group-hover:opacity-100 transition-opacity" fill="currentColor" />
                 </div>
                 <div className="flex-1 min-w-0">

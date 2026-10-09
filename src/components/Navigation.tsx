@@ -8,22 +8,29 @@ import {
   Globe, Zap, Sparkles, Star, ListMusic, Mic2, 
   Music, Disc, UserCircle, Plus, Heart, Download, HelpCircle 
 } from "lucide-react";
+import { usePlayerStore } from "@/store/playerStore";
 
 export function Navigation() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
+  const { closeFullScreen } = usePlayerStore();
 
   if (pathname?.startsWith('/admin')) return null;
 
   const NavContent = () => (
     <div className="flex flex-col h-full py-6 px-4 overflow-y-auto custom-scrollbar">
       <div className="mb-8 px-2 flex items-center justify-between">
-        <Link href="/" className="text-app-logo text-brand-dark dark:text-brand-light">T-Tune</Link>
+        <Link href="/" onClick={() => closeFullScreen()} className="flex items-center gap-3 group">
+          <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg border border-light-silver dark:border-surface-ash group-hover:scale-105 transition-transform">
+            <img src="/logo.jpg" alt="T-Tune Logo" className="w-full h-full object-cover" />
+          </div>
+          <span className="text-app-logo text-brand-dark dark:text-brand-light">T-Tune</span>
+        </Link>
       </div>
 
       <nav className="flex flex-col gap-6 flex-1 pb-10">
         <div>
-          <Link href="/" className="flex items-center gap-3 px-2 py-2 text-text-dark dark:text-text-white hover:text-primary transition-colors group">
+          <Link href="/" onClick={() => closeFullScreen()} className="flex items-center gap-3 px-2 py-2 text-text-dark dark:text-text-white hover:text-primary transition-colors group">
             <Home size={20} className="group-hover:text-primary" />
             <span className="text-nav font-bold">Home</span>
           </Link>
@@ -38,7 +45,7 @@ export function Navigation() {
         </div>
 
         <div>
-          <Link href="/search" className="flex items-center gap-3 px-2 py-2 text-text-dark dark:text-text-white hover:text-primary transition-colors group">
+          <Link href="/search" onClick={() => closeFullScreen()} className="flex items-center gap-3 px-2 py-2 text-text-dark dark:text-text-white hover:text-primary transition-colors group">
             <Search size={20} className="group-hover:text-primary" />
             <span className="text-nav font-bold">Search</span>
           </Link>
@@ -50,7 +57,7 @@ export function Navigation() {
         </div>
 
         <div>
-          <Link href="/library" className="flex items-center gap-3 px-2 py-2 text-text-dark dark:text-text-white hover:text-primary transition-colors group">
+          <Link href="/library" onClick={() => closeFullScreen()} className="flex items-center gap-3 px-2 py-2 text-text-dark dark:text-text-white hover:text-primary transition-colors group">
             <Library size={20} className="group-hover:text-primary" />
             <span className="text-nav font-bold">Library</span>
           </Link>
@@ -61,7 +68,7 @@ export function Navigation() {
         </div>
 
         <div>
-          <Link href="/settings" className="flex items-center gap-3 px-2 py-2 text-text-dark dark:text-text-white hover:text-primary transition-colors group">
+          <Link href="/settings" onClick={() => closeFullScreen()} className="flex items-center gap-3 px-2 py-2 text-text-dark dark:text-text-white hover:text-primary transition-colors group">
             <Settings size={20} className="group-hover:text-primary" />
             <span className="text-nav font-bold">Settings</span>
           </Link>
@@ -82,20 +89,22 @@ export function Navigation() {
       </aside>
 
       {/* Mobile Bottom Navigation Bar (Premium App Feel) */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 h-[68px] bg-light-ivory/90 dark:bg-bg-midnight/90 backdrop-blur-xl border-t border-light-silver dark:border-surface-ash z-50 flex items-center justify-around px-2 pb-safe">
-        <BottomNavItem href="/" icon={<Home size={24} />} label="Home" active={pathname === "/"} />
-        <BottomNavItem href="/search" icon={<Search size={24} />} label="Search" active={pathname.startsWith("/search")} />
-        <BottomNavItem href="/library" icon={<Library size={24} />} label="Library" active={pathname.startsWith("/library") || pathname.startsWith("/playlists") || pathname === "/liked"} />
-        <BottomNavItem href="/settings" icon={<Settings size={24} />} label="Settings" active={pathname.startsWith("/settings") || pathname === "/install" || pathname === "/how-it-works"} />
+      <div className="md:hidden fixed bottom-0 left-0 right-0 h-[68px] bg-light-ivory/95 dark:bg-bg-midnight/95 backdrop-blur-xl border-t border-light-silver dark:border-surface-ash z-50 flex items-center justify-around px-2 pb-safe">
+        <BottomNavItem href="/" icon={<Home size={22} />} label="Home" active={pathname === "/"} />
+        <BottomNavItem href="/search" icon={<Search size={22} />} label="Search" active={pathname.startsWith("/search")} />
+        <BottomNavItem href="/library" icon={<Library size={22} />} label="Library" active={pathname.startsWith("/library") || pathname.startsWith("/playlists") || pathname === "/liked"} />
+        <BottomNavItem href="/settings" icon={<Settings size={22} />} label="Settings" active={pathname.startsWith("/settings") || pathname === "/install" || pathname === "/how-it-works"} />
       </div>
     </>
   );
 }
 
 function NavItem({ href, icon, text, active }: { href: string; icon: React.ReactNode; text: string; active?: boolean }) {
+  const { closeFullScreen } = usePlayerStore();
   return (
     <Link 
       href={href} 
+      onClick={() => closeFullScreen()}
       className={`flex items-center gap-3 py-1.5 px-2 transition-colors text-body ${
         active 
           ? "text-primary font-bold" 
@@ -109,9 +118,11 @@ function NavItem({ href, icon, text, active }: { href: string; icon: React.React
 }
 
 function BottomNavItem({ href, icon, label, active }: { href: string; icon: React.ReactNode; label: string; active?: boolean }) {
+  const { closeFullScreen } = usePlayerStore();
   return (
     <Link 
-      href={href}
+      href={href} 
+      onClick={() => closeFullScreen()}
       className={`flex flex-col items-center justify-center w-16 h-full gap-1 transition-colors ${
         active ? "text-primary" : "text-text-secondary dark:text-text-muted hover:text-text-dark dark:hover:text-text-white"
       }`}

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { db, Album, Entity } from "@/lib/db";
 import { Song, usePlayerStore } from "@/store/playerStore";
-import { Search, Play } from "lucide-react";
+import { Search, Play, Mic, MicOff } from "lucide-react";
 import { SongActionMenu } from "@/components/SongActionMenu";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -11,6 +11,8 @@ import { pageTransitionVariants } from "@/lib/animations";
 
 export default function SearchPage() {
   const [query, setQuery] = useState("");
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
   const [songs, setSongs] = useState<Song[]>([]);
   const [albums, setAlbums] = useState<Album[]>([]);
   const [artists, setArtists] = useState<Entity[]>([]);
@@ -23,20 +25,88 @@ export default function SearchPage() {
       const allAlbums = await db.getAllAlbums();
       const allArtists = await db.getAllEntities("singers");
 
+      // Resolve album covers from songs if missing
+      const resolvedAlbums = allAlbums.map(album => {
+        if (!album.cover) {
+          const songInAlbum = allSongs.find(s => s.album?.toLowerCase() === album.name.toLowerCase() && s.coverUrl);
+          if (songInAlbum?.coverUrl) return { ...album, cover: songInAlbum.coverUrl };
+        }
+        return album;
+      });
+
+      // Resolve artist photos from songs if missing
+      const resolvedArtists = allArtists.map(artist => {
+        if (!artist.photoUrl) {
+          const songByArtist = allSongs.find(s => s.singers?.toLowerCase().includes(artist.name.toLowerCase()) && s.coverUrl);
+          if (songByArtist?.coverUrl) return { ...artist, photoUrl: songByArtist.coverUrl };
+        }
+        return artist;
+      });
+
       if (!query.trim()) {
          setSongs(allSongs.slice(0, 5));
-         setAlbums(allAlbums.slice(0, 5));
-         setArtists(allArtists.slice(0, 5));
+         setAlbums(resolvedAlbums.slice(0, 5));
+         setArtists(resolvedArtists.slice(0, 5));
          return;
       }
 
       const q = query.toLowerCase();
       setSongs(allSongs.filter(s => s.title.toLowerCase().includes(q) || s.singers?.toLowerCase().includes(q)));
-      setAlbums(allAlbums.filter(a => a.name.toLowerCase().includes(q)));
-      setArtists(allArtists.filter(a => a.name.toLowerCase().includes(q)));
+      setAlbums(resolvedAlbums.filter(a => a.name.toLowerCase().includes(q)));
+      setArtists(resolvedArtists.filter(a => a.name.toLowerCase().includes(q)));
     }
     loadAll();
+
+    window.addEventListener('database-synced', loadAll);
+    window.addEventListener('database-updated', loadAll);
+    return () => {
+      window.removeEventListener('database-synced', loadAll);
+      window.removeEventListener('database-updated', loadAll);
+    };
   }, [query]);
+
+  const toggleVoiceSearch = () => {
+    if (isListening) {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      setIsListening(false);
+      return;
+    }
+
+    if (typeof window === 'undefined') return;
+    // @ts-ignore
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Voice search is not supported in this browser. Try Chrome, Edge, or Safari.");
+      return;
+    }
+    
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
+    
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setQuery(transcript);
+    };
+    
+    recognition.onerror = (event: any) => {
+      console.error("Voice search error:", event.error);
+      setIsListening(false);
+    };
+    
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+    
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
 
   return (
     <motion.div 
@@ -55,8 +125,15 @@ export default function SearchPage() {
             placeholder="Search for songs, artists, or albums..." 
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="w-full bg-white dark:bg-surface-graphite border-2 border-transparent focus:border-primary rounded-2xl pl-12 pr-4 py-4 text-lg text-text-dark dark:text-text-white focus:outline-none shadow-sm transition-all"
+            className="w-full bg-white dark:bg-surface-graphite border-2 border-transparent focus:border-primary rounded-2xl pl-12 pr-14 py-4 text-lg text-text-dark dark:text-text-white focus:outline-none shadow-sm transition-all"
           />
+          <button 
+            onClick={toggleVoiceSearch}
+            className={`absolute right-4 top-1/2 -translate-y-1/2 transition-colors ${isListening ? 'text-status-error animate-pulse' : 'text-text-muted hover:text-primary'}`}
+            title={isListening ? "Stop Listening" : "Voice Search"}
+          >
+            {isListening ? <MicOff size={24} /> : <Mic size={24} />}
+          </button>
         </div>
       </header>
 
@@ -76,7 +153,12 @@ export default function SearchPage() {
                 className="flex items-center gap-4 p-3 rounded-xl hover:bg-white dark:hover:bg-surface-graphite group cursor-pointer transition-colors border border-transparent hover:border-light-silver dark:hover:border-surface-ash shadow-sm hover:shadow-md"
               >
                 <div className="w-12 h-12 rounded-lg bg-light-silver dark:bg-surface-ash overflow-hidden flex-shrink-0 relative">
-                  <img src={song.coverUrl || 'https://via.placeholder.com/48'} alt="" className="w-full h-full object-cover group-hover:opacity-50 transition-opacity" />
+                  <img 
+                    src={song.coverUrl || 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=100&q=80'} 
+                    alt={song.title} 
+                    onError={(e) => { (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=100&q=80"; }}
+                    className="w-full h-full object-cover group-hover:opacity-50 transition-opacity" 
+                  />
                   <Play size={20} className="absolute inset-0 m-auto text-white opacity-0 group-hover:opacity-100 transition-opacity" fill="currentColor" />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -104,10 +186,15 @@ export default function SearchPage() {
              {albums.map((album) => (
                <div key={album.id} className="bg-white dark:bg-surface-graphite p-4 rounded-xl border border-light-silver dark:border-surface-ash shadow-sm group">
                  <div className="aspect-square bg-light-silver dark:bg-surface-ash rounded-lg mb-3 overflow-hidden">
-                    <img src={album.cover || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=500&q=80"} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                    <img 
+                      src={album.cover || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=500&q=80"} 
+                      alt={album.name}
+                      onError={(e) => { (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=500&q=80"; }}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+                    />
                  </div>
                  <p className="font-bold text-text-dark dark:text-text-white truncate">{album.name}</p>
-                 <p className="text-xs text-text-muted mt-1">{album.year}</p>
+                 <p className="text-xs text-text-muted mt-1">{album.year || "Album"}</p>
                </div>
              ))}
           </div>
@@ -126,7 +213,12 @@ export default function SearchPage() {
              {artists.map((artist) => (
                 <Link href={`/artist/${artist.id}`} key={artist.id} className="flex-shrink-0 w-32 md:w-40 group cursor-pointer block">
                   <div className="w-32 h-32 md:w-40 md:h-40 bg-light-pearl dark:bg-surface-cocoa rounded-full mb-3 shadow-sm border-2 border-transparent group-hover:border-primary overflow-hidden relative transition-colors">
-                     <img src={artist.photoUrl || "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80"} alt={artist.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                     <img 
+                       src={artist.photoUrl || "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80"} 
+                       alt={artist.name} 
+                       onError={(e) => { (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80"; }}
+                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+                     />
                   </div>
                   <p className="text-album-title text-center truncate text-text-dark dark:text-text-white group-hover:text-primary transition-colors">{artist.name}</p>
                   <p className="text-artist-name text-center truncate text-text-secondary dark:text-text-muted text-sm mt-1">Artist</p>

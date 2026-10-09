@@ -9,6 +9,7 @@ import { db, Album, Entity, Language } from "@/lib/db";
 import { Song } from "@/store/playerStore";
 import { SmartDropdown } from "@/components/SmartDropdown";
 import { MediaUpload } from "@/components/MediaUpload";
+import { CoverUpload } from "@/components/CoverUpload";
 import { useToastStore } from "@/store/toastStore";
 
 type Tab = "statistics" | "songs" | "albums" | "singers" | "lyricists" | "musicians" | "languages";
@@ -419,6 +420,8 @@ function SongsManager() {
        return;
     }
     const isUpdating = !!formData.id;
+    const songCover = (formData.coverUrl || "").trim();
+
     const newSong: Song = {
       id: formData.id || Math.random().toString(36).substring(7),
       title: formData.title || "",
@@ -426,11 +429,79 @@ function SongsManager() {
       singers: formData.singers || "",
       musician: formData.musician || "",
       year: formData.year || "",
-      url: formData.url || "https://example.com/audio.mp3",
-      coverUrl: formData.coverUrl || "",
+      url: formData.url || "https://res.cloudinary.com/kjbnwmxk/video/upload/v1791523494/ttune_audio/default_track.mp3",
+      coverUrl: songCover,
       language: formData.language || "",
+      lyricist: formData.lyricist || "",
     };
     await db.putSong(newSong);
+
+    // Automatically propagate cover photo to Album if album has no cover
+    if (formData.album) {
+      try {
+        const allAlbums = await db.getAllAlbums();
+        const existingAlbum = allAlbums.find(a => a.name.toLowerCase() === formData.album!.toLowerCase());
+        if (existingAlbum) {
+          if (!existingAlbum.cover && songCover) {
+            await db.putAlbum({ ...existingAlbum, cover: songCover });
+          }
+        } else {
+          await db.putAlbum({
+            id: Math.random().toString(36).substring(7),
+            name: formData.album,
+            cover: songCover,
+            year: formData.year || ""
+          });
+        }
+      } catch (err) {
+        console.warn("Album cover sync notice:", err);
+      }
+    }
+
+    // Automatically propagate cover photo to Singer(s) if singer has no photo
+    if (formData.singers && songCover) {
+      try {
+        const singerNames = formData.singers.split(",").map(s => s.trim()).filter(Boolean);
+        const allSingers = await db.getAllEntities("singers");
+        for (const sName of singerNames) {
+          const matchedSinger = allSingers.find(s => s.name.toLowerCase() === sName.toLowerCase());
+          if (matchedSinger && !matchedSinger.photoUrl) {
+            await db.putEntity("singers", { ...matchedSinger, photoUrl: songCover });
+          } else if (!matchedSinger) {
+            await db.putEntity("singers", {
+              id: Math.random().toString(36).substring(7),
+              name: sName,
+              photoUrl: songCover
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("Singer photo sync notice:", err);
+      }
+    }
+
+    // Automatically propagate cover photo to Musician (Composer) if composer has no photo
+    if (formData.musician && songCover) {
+      try {
+        const musicianNames = formData.musician.split(",").map(m => m.trim()).filter(Boolean);
+        const allMusicians = await db.getAllEntities("musicians");
+        for (const mName of musicianNames) {
+          const matchedMusician = allMusicians.find(m => m.name.toLowerCase() === mName.toLowerCase());
+          if (matchedMusician && !matchedMusician.photoUrl) {
+            await db.putEntity("musicians", { ...matchedMusician, photoUrl: songCover });
+          } else if (!matchedMusician) {
+            await db.putEntity("musicians", {
+              id: Math.random().toString(36).substring(7),
+              name: mName,
+              photoUrl: songCover
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("Musician photo sync notice:", err);
+      }
+    }
+
     setFormData({});
     setIsAdding(false);
     loadSongs();
@@ -470,10 +541,22 @@ function SongsManager() {
               <SmartDropdown 
                 label="Album" 
                 value={formData.album || ''} 
-                onChange={v => setFormData({...formData, album: v})} 
+                onChange={async (v) => {
+                  const updated = { ...formData, album: v };
+                  // If current song has no cover, inherit from selected album!
+                  if (!formData.coverUrl && v) {
+                    const albums = await db.getAllAlbums();
+                    const matched = albums.find(a => a.name.toLowerCase() === v.toLowerCase());
+                    if (matched?.cover) {
+                      updated.coverUrl = matched.cover;
+                      useToastStore.getState().addToast(`Inherited cover from album "${matched.name}"`, "info");
+                    }
+                  }
+                  setFormData(updated);
+                }} 
                 placeholder="Select Album..." 
                 fetchOptions={async () => (await db.getAllAlbums()).map(a => a.name)}
-                onCreateNew={async (name) => { await db.putAlbum({ id: Math.random().toString(36).substring(7), name, cover: "", year: "" }) }}
+                onCreateNew={async (name) => { await db.putAlbum({ id: Math.random().toString(36).substring(7), name, cover: formData.coverUrl || "", year: formData.year || "" }) }}
               />
               <SmartDropdown 
                 label="Singer(s) (Artists)" 
@@ -481,7 +564,7 @@ function SongsManager() {
                 onChange={v => setFormData({...formData, singers: v})} 
                 placeholder="Select Singer..." 
                 fetchOptions={async () => (await db.getAllEntities("singers")).map(s => s.name)}
-                onCreateNew={async (name) => { await db.putEntity("singers", { id: Math.random().toString(36).substring(7), name, photoUrl: "" }) }}
+                onCreateNew={async (name) => { await db.putEntity("singers", { id: Math.random().toString(36).substring(7), name, photoUrl: formData.coverUrl || "" }) }}
                 multiSelect={true}
               />
               <SmartDropdown 
@@ -500,9 +583,24 @@ function SongsManager() {
                 onChange={v => setFormData({...formData, musician: v})} 
                 placeholder="Select Composer..." 
                 fetchOptions={async () => (await db.getAllEntities("musicians")).map(m => m.name)}
-                onCreateNew={async (name) => { await db.putEntity("musicians", { id: Math.random().toString(36).substring(7), name, photoUrl: "" }) }}
+                onCreateNew={async (name) => { await db.putEntity("musicians", { id: Math.random().toString(36).substring(7), name, photoUrl: formData.coverUrl || "" }) }}
+                multiSelect={true}
               />
-              <Input label="Cover URL" value={formData.coverUrl || ''} onChange={v => setFormData({...formData, coverUrl: v})} placeholder="https://..." />
+              <SmartDropdown 
+                label="Lyrics (Lyricist)" 
+                value={formData.lyricist || ''} 
+                onChange={v => setFormData({...formData, lyricist: v})} 
+                placeholder="Select Lyricist..." 
+                fetchOptions={async () => (await db.getAllEntities("lyricists")).map(l => l.name)}
+                onCreateNew={async (name) => { await db.putEntity("lyricists", { id: Math.random().toString(36).substring(7), name, photoUrl: formData.coverUrl || "" }) }}
+                multiSelect={true}
+              />
+              <CoverUpload 
+                label="Cover Photo (Download from link or upload file)" 
+                value={formData.coverUrl || ''} 
+                onChange={v => setFormData({...formData, coverUrl: v})} 
+                placeholder="Paste direct image, Spotify, YouTube or web link..."
+              />
               <Input label="Year" value={formData.year || ''} onChange={v => setFormData({...formData, year: v})} placeholder="2023" />
             </div>
             <MediaUpload url={formData.url} onUrlChange={v => setFormData({...formData, url: v})} />
@@ -601,12 +699,29 @@ function AlbumsManager() {
       return;
     }
     const isUpdating = !!formData.id;
+    const albumCover = (formData.cover || "").trim();
+
     await db.putAlbum({
       id: formData.id || Math.random().toString(36).substring(7),
       name: formData.name,
-      cover: formData.cover || "",
+      cover: albumCover,
       year: formData.year || "",
     });
+
+    // If album has a cover, backfill any songs in this album that lack a cover
+    if (albumCover) {
+      try {
+        const allSongs = await db.getAllSongs();
+        for (const s of allSongs) {
+          if (s.album?.toLowerCase() === formData.name.toLowerCase() && !s.coverUrl) {
+            await db.putSong({ ...s, coverUrl: albumCover });
+          }
+        }
+      } catch (err) {
+        console.warn("Song backfill error:", err);
+      }
+    }
+
     setFormData({});
     setIsAdding(false);
     loadAlbums();
@@ -641,7 +756,12 @@ function AlbumsManager() {
         <form onSubmit={handleSave} className="space-y-4 max-w-xl mt-4">
           <Input label="Album Name *" value={formData.name || ''} onChange={v => setFormData({...formData, name: v})} placeholder="e.g. Divide" autoFocus />
           <Input label="Release Year" value={formData.year || ''} onChange={v => setFormData({...formData, year: v})} placeholder="2017" />
-          <Input label="Cover Photo URL" value={formData.cover || ''} onChange={v => setFormData({...formData, cover: v})} placeholder="https://..." />
+          <CoverUpload 
+            label="Album Cover Photo (Download from link or upload file)" 
+            value={formData.cover || ''} 
+            onChange={v => setFormData({...formData, cover: v})} 
+            placeholder="Paste direct image, Spotify, or web link..."
+          />
           <button type="submit" className="mt-4 px-6 py-3 rounded-full bg-primary text-text-white font-bold hover:bg-brand-dark transition-colors shadow-md">
             {formData.id ? "Update Album" : "Save Album"} (Enter)
           </button>
@@ -772,7 +892,12 @@ function EntityManager({ title, entityName, icon }: { title: string, entityName:
         </h2>
         <form onSubmit={handleSave} className="space-y-4 max-w-xl mt-4">
           <Input label="Name *" value={formData.name || ''} onChange={v => setFormData({...formData, name: v})} placeholder="Name..." autoFocus />
-          <Input label="Photo URL" value={formData.photoUrl || ''} onChange={v => setFormData({...formData, photoUrl: v})} placeholder="https://..." />
+          <CoverUpload 
+            label="Photo (Download from link or upload file)" 
+            value={formData.photoUrl || ''} 
+            onChange={v => setFormData({...formData, photoUrl: v})} 
+            placeholder="Paste direct image or profile link..."
+          />
           <button type="submit" className="mt-4 px-6 py-3 rounded-full bg-primary text-text-white font-bold hover:bg-brand-dark transition-colors shadow-md">
             {formData.id ? "Update Entry" : "Save Entry"} (Enter)
           </button>

@@ -10,6 +10,7 @@ export interface Song {
   url: string;
   coverUrl?: string;
   language?: string;
+  lyricist?: string;
   duration?: number;
 }
 
@@ -20,7 +21,7 @@ interface PlayerState {
   isShuffle: boolean;
   isLoop: boolean;
   favorites: string[];
-  
+  isFullScreenOpen: boolean;
   
   setIsPlaying: (playing: boolean) => void;
   playSong: (song: Song, queue?: Song[]) => void;
@@ -35,6 +36,9 @@ interface PlayerState {
   toggleShuffle: () => void;
   toggleLoop: () => void;
   toggleFavorite: (songId: string) => void;
+  setIsFullScreenOpen: (isOpen: boolean) => void;
+  openFullScreen: () => void;
+  closeFullScreen: () => void;
 }
 
 export const usePlayerStore = create<PlayerState>((set, get) => ({
@@ -44,6 +48,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   isShuffle: false,
   isLoop: false,
   favorites: typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('favorites') || '[]') : [],
+  isFullScreenOpen: false,
 
   setIsPlaying: (playing) => set({ isPlaying: playing }),
   
@@ -85,6 +90,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     return { favorites: newFavs };
   }),
 
+  setIsFullScreenOpen: (isOpen) => set({ isFullScreenOpen: isOpen }),
+  openFullScreen: () => set({ isFullScreenOpen: true }),
+  closeFullScreen: () => set({ isFullScreenOpen: false }),
+
   playNext: () => {
     const { queue, currentSong, isShuffle, isLoop } = get();
     if (!currentSong || queue.length === 0) return;
@@ -100,17 +109,25 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       set({ currentSong: queue[index + 1], isPlaying: true });
     } else if (isLoop && queue.length > 0) {
       set({ currentSong: queue[0], isPlaying: true });
+    } else if (queue.length > 1) {
+      // Wrap around queue
+      set({ currentSong: queue[0], isPlaying: true });
     } else {
       set({ isPlaying: false });
     }
   },
   
   playPrevious: () => {
-    const { queue, currentSong } = get();
+    const { queue, currentSong, isLoop } = get();
     if (!currentSong || queue.length === 0) return;
     const index = queue.findIndex(s => s.id === currentSong.id);
     if (index > 0) {
       set({ currentSong: queue[index - 1], isPlaying: true });
+    } else if (isLoop && queue.length > 0) {
+      set({ currentSong: queue[queue.length - 1], isPlaying: true });
+    } else if (queue.length > 1) {
+      // Wrap around to end
+      set({ currentSong: queue[queue.length - 1], isPlaying: true });
     }
   }
 }));

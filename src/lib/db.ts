@@ -112,6 +112,12 @@ if (typeof window !== 'undefined') {
   });
 }
 
+function notifyChange(detail?: any) {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('database-updated', { detail }));
+  }
+}
+
 export const db = {
   // --- Songs ---
   async getAllSongs(): Promise<Song[]> {
@@ -123,9 +129,16 @@ export const db = {
     if (!dbPromise) return;
     const database = await dbPromise;
     await database.put('songs', song);
+    notifyChange({ type: 'song', item: song });
     
-    // Sync to Supabase
+    // Cloud Sync via /api/sync (Cloudinary + Supabase backend)
     if (typeof window !== 'undefined') {
+      fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save', type: 'song', item: song })
+      }).catch(err => console.warn("API sync song error:", err));
+
       supabase.from('songs').upsert({
         id: song.id,
         title: song.title,
@@ -134,16 +147,25 @@ export const db = {
         musician: song.musician,
         year: song.year,
         url: song.url,
-        "coverUrl": song.coverUrl,
-        language: song.language
-      }).then(({ error }) => { if (error) console.error("Supabase sync error:", error); });
+        coverUrl: song.coverUrl,
+        language: song.language,
+        lyricist: song.lyricist
+      }).then(({ error }) => { if (error) console.warn("Supabase sync notice:", error.message); });
     }
   },
   async deleteSong(id: string): Promise<void> {
     if (!dbPromise) return;
     const database = await dbPromise;
     await database.delete('songs', id);
+    notifyChange({ type: 'song', id });
+
     if (typeof window !== 'undefined') {
+      fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', type: 'song', item: { id } })
+      }).catch(err => console.warn("API delete song error:", err));
+
       supabase.from('songs').delete().eq('id', id).then();
     }
   },
@@ -156,12 +178,32 @@ export const db = {
   async putAlbum(album: Album): Promise<void> {
     if (!dbPromise) return;
     await (await dbPromise).put('albums', album);
-    if (typeof window !== 'undefined') supabase.from('albums').upsert(album).then();
+    notifyChange({ type: 'album', item: album });
+
+    if (typeof window !== 'undefined') {
+      fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save', type: 'album', item: album })
+      }).catch(err => console.warn("API sync album error:", err));
+
+      supabase.from('albums').upsert(album).then();
+    }
   },
   async deleteAlbum(id: string): Promise<void> {
     if (!dbPromise) return;
     await (await dbPromise).delete('albums', id);
-    if (typeof window !== 'undefined') supabase.from('albums').delete().eq('id', id).then();
+    notifyChange({ type: 'album', id });
+
+    if (typeof window !== 'undefined') {
+      fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', type: 'album', item: { id } })
+      }).catch(err => console.warn("API delete album error:", err));
+
+      supabase.from('albums').delete().eq('id', id).then();
+    }
   },
 
   // --- Entities (Generic) ---
@@ -172,14 +214,30 @@ export const db = {
   async putEntity(storeName: 'singers' | 'lyricists' | 'musicians', entity: Entity): Promise<void> {
     if (!dbPromise) return;
     await (await dbPromise).put(storeName, entity);
+    notifyChange({ type: storeName, item: entity });
+
     if (typeof window !== 'undefined') {
+      fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save', type: storeName, item: entity })
+      }).catch(err => console.warn("API sync entity error:", err));
+
       supabase.from('entities').upsert({ ...entity, type: storeName }).then();
     }
   },
   async deleteEntity(storeName: 'singers' | 'lyricists' | 'musicians', id: string): Promise<void> {
     if (!dbPromise) return;
     await (await dbPromise).delete(storeName, id);
+    notifyChange({ type: storeName, id });
+
     if (typeof window !== 'undefined') {
+      fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', type: storeName, item: { id } })
+      }).catch(err => console.warn("API delete entity error:", err));
+
       supabase.from('entities').delete().eq('id', id).eq('type', storeName).then();
     }
   },
@@ -192,12 +250,32 @@ export const db = {
   async putLanguage(language: Language): Promise<void> {
     if (!dbPromise) return;
     await (await dbPromise).put('languages', language);
-    if (typeof window !== 'undefined') supabase.from('languages').upsert(language).then();
+    notifyChange({ type: 'language', item: language });
+
+    if (typeof window !== 'undefined') {
+      fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save', type: 'language', item: language })
+      }).catch(err => console.warn("API sync language error:", err));
+
+      supabase.from('languages').upsert(language).then();
+    }
   },
   async deleteLanguage(id: string): Promise<void> {
     if (!dbPromise) return;
     await (await dbPromise).delete('languages', id);
-    if (typeof window !== 'undefined') supabase.from('languages').delete().eq('id', id).then();
+    notifyChange({ type: 'language', id });
+
+    if (typeof window !== 'undefined') {
+      fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', type: 'language', item: { id } })
+      }).catch(err => console.warn("API delete language error:", err));
+
+      supabase.from('languages').delete().eq('id', id).then();
+    }
   },
 
   // --- Playlists ---
@@ -212,10 +290,12 @@ export const db = {
   async putPlaylist(playlist: Playlist): Promise<void> {
     if (!dbPromise) return;
     await (await dbPromise).put('playlists', playlist);
+    notifyChange({ type: 'playlist', item: playlist });
   },
   async deletePlaylist(id: string): Promise<void> {
     if (!dbPromise) return;
     await (await dbPromise).delete('playlists', id);
+    notifyChange({ type: 'playlist', id });
   },
 
   // --- User Data (Favorites) ---
@@ -227,6 +307,7 @@ export const db = {
   async saveFavorites(songIds: string[]): Promise<void> {
     if (!dbPromise) return;
     await (await dbPromise).put('user_data', { id: 'favorites', data: songIds });
+    notifyChange({ type: 'favorites', songIds });
   },
 
   // --- Cloud Sync ---
@@ -235,41 +316,121 @@ export const db = {
     const database = await dbPromise;
     
     try {
-      const [{ data: songs }, { data: albums }, { data: entities }, { data: languages }] = await Promise.all([
-        supabase.from('songs').select('*'),
-        supabase.from('albums').select('*'),
-        supabase.from('entities').select('*'),
-        supabase.from('languages').select('*'),
-      ]);
-
-      if (songs) {
-        const tx = database.transaction('songs', 'readwrite');
-        for (const s of songs) tx.store.put(s as Song);
-        await tx.done;
-      }
-      
-      if (albums) {
-        const tx = database.transaction('albums', 'readwrite');
-        for (const a of albums) tx.store.put(a as Album);
-        await tx.done;
-      }
-
-      if (entities) {
-        const singersTx = database.transaction('singers', 'readwrite');
-        const lyricistsTx = database.transaction('lyricists', 'readwrite');
-        const musiciansTx = database.transaction('musicians', 'readwrite');
-        for (const e of entities) {
-          if (e.type === 'singers') singersTx.store.put({ id: e.id, name: e.name, photoUrl: e.photoUrl });
-          if (e.type === 'lyricists') lyricistsTx.store.put({ id: e.id, name: e.name, photoUrl: e.photoUrl });
-          if (e.type === 'musicians') musiciansTx.store.put({ id: e.id, name: e.name, photoUrl: e.photoUrl });
+      // 1. Fetch from our centralized API sync endpoint
+      let hasCloudData = false;
+      try {
+        const res = await fetch('/api/sync', { cache: 'no-store' });
+        if (res.ok) {
+          const cloudData = await res.json();
+          if (cloudData.songs && cloudData.songs.length > 0) {
+            hasCloudData = true;
+            const tx = database.transaction('songs', 'readwrite');
+            for (const s of cloudData.songs) tx.store.put(s as Song);
+            await tx.done;
+          }
+          if (cloudData.albums && cloudData.albums.length > 0) {
+            const tx = database.transaction('albums', 'readwrite');
+            for (const a of cloudData.albums) tx.store.put(a as Album);
+            await tx.done;
+          }
+          if (cloudData.entities && cloudData.entities.length > 0) {
+            const singersTx = database.transaction('singers', 'readwrite');
+            const lyricistsTx = database.transaction('lyricists', 'readwrite');
+            const musiciansTx = database.transaction('musicians', 'readwrite');
+            for (const e of cloudData.entities) {
+              if (e.type === 'singers') singersTx.store.put({ id: e.id, name: e.name, photoUrl: e.photoUrl });
+              if (e.type === 'lyricists') lyricistsTx.store.put({ id: e.id, name: e.name, photoUrl: e.photoUrl });
+              if (e.type === 'musicians') musiciansTx.store.put({ id: e.id, name: e.name, photoUrl: e.photoUrl });
+            }
+            await Promise.all([singersTx.done, lyricistsTx.done, musiciansTx.done]);
+          }
+          if (cloudData.languages && cloudData.languages.length > 0) {
+            const tx = database.transaction('languages', 'readwrite');
+            for (const l of cloudData.languages) tx.store.put(l as Language);
+            await tx.done;
+          }
         }
-        await Promise.all([singersTx.done, lyricistsTx.done, musiciansTx.done]);
+      } catch (apiErr) {
+        console.warn("Direct API sync attempt notice:", apiErr);
       }
 
-      if (languages) {
-        const tx = database.transaction('languages', 'readwrite');
-        for (const l of languages) tx.store.put(l as Language);
-        await tx.done;
+      // 2. Also query Supabase directly
+      try {
+        const [{ data: songs }, { data: albums }, { data: entities }, { data: languages }] = await Promise.all([
+          supabase.from('songs').select('*'),
+          supabase.from('albums').select('*'),
+          supabase.from('entities').select('*'),
+          supabase.from('languages').select('*'),
+        ]);
+
+        if (songs && songs.length > 0) {
+          hasCloudData = true;
+          const tx = database.transaction('songs', 'readwrite');
+          for (const s of songs) tx.store.put(s as Song);
+          await tx.done;
+        }
+        
+        if (albums && albums.length > 0) {
+          const tx = database.transaction('albums', 'readwrite');
+          for (const a of albums) tx.store.put(a as Album);
+          await tx.done;
+        }
+
+        if (entities && entities.length > 0) {
+          const singersTx = database.transaction('singers', 'readwrite');
+          const lyricistsTx = database.transaction('lyricists', 'readwrite');
+          const musiciansTx = database.transaction('musicians', 'readwrite');
+          for (const e of entities) {
+            if (e.type === 'singers') singersTx.store.put({ id: e.id, name: e.name, photoUrl: e.photoUrl });
+            if (e.type === 'lyricists') lyricistsTx.store.put({ id: e.id, name: e.name, photoUrl: e.photoUrl });
+            if (e.type === 'musicians') musiciansTx.store.put({ id: e.id, name: e.name, photoUrl: e.photoUrl });
+          }
+          await Promise.all([singersTx.done, lyricistsTx.done, musiciansTx.done]);
+        }
+
+        if (languages && languages.length > 0) {
+          const tx = database.transaction('languages', 'readwrite');
+          for (const l of languages) tx.store.put(l as Language);
+          await tx.done;
+        }
+      } catch (supaErr) {
+        console.warn("Direct Supabase query notice:", supaErr);
+      }
+
+      // 3. If local database has songs that the cloud doesn't have, backfill to cloud
+      const localSongs = await database.getAll('songs');
+      if (localSongs.length > 0 && !hasCloudData) {
+        const [localAlbums, localSingers, localLyricists, localMusicians, localLangs] = await Promise.all([
+          database.getAll('albums'),
+          database.getAll('singers'),
+          database.getAll('lyricists'),
+          database.getAll('musicians'),
+          database.getAll('languages')
+        ]);
+        const allEntities = [
+          ...localSingers.map(s => ({ ...s, type: 'singers' })),
+          ...localLyricists.map(l => ({ ...l, type: 'lyricists' })),
+          ...localMusicians.map(m => ({ ...m, type: 'musicians' })),
+        ];
+
+        fetch('/api/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fullCatalog: {
+              songs: localSongs,
+              albums: localAlbums,
+              entities: allEntities,
+              languages: localLangs
+            }
+          })
+        }).catch(console.warn);
+      }
+
+      // 4. Notify UI that sync has completed and new data is ready
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('database-synced'));
+        window.dispatchEvent(new CustomEvent('database-updated'));
       }
     } catch (e) {
       console.error("Failed to sync from cloud", e);

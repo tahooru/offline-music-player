@@ -98,6 +98,7 @@ export default function PlaylistPage() {
             <img 
               src={songs[0].coverUrl} 
               alt="Playlist Cover" 
+              onError={(e) => { (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=500&q=80"; }}
               className="w-full h-full object-cover"
             />
           ) : (
@@ -158,7 +159,12 @@ export default function PlaylistPage() {
                   {index + 1}
                 </div>
                 <div className="w-12 h-12 rounded-lg bg-light-silver dark:bg-surface-ash overflow-hidden flex-shrink-0 relative">
-                  <img src={song.coverUrl || 'https://via.placeholder.com/48'} alt="" className="w-full h-full object-cover group-hover:opacity-50 transition-opacity" />
+                  <img 
+                    src={song.coverUrl || 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=100&q=80'} 
+                    alt={song.title} 
+                    onError={(e) => { (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=100&q=80"; }}
+                    className="w-full h-full object-cover group-hover:opacity-50 transition-opacity" 
+                  />
                   <Play size={20} className="absolute inset-0 m-auto text-white opacity-0 group-hover:opacity-100 transition-opacity" fill="currentColor" />
                 </div>
                 <div className="flex-1 min-w-0">

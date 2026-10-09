@@ -26,6 +26,7 @@ import { Footer } from "@/components/Footer";
 import { PlayerSpacer } from "@/components/PlayerSpacer";
 import { ToastProvider } from "@/components/ToastProvider";
 import { SyncProvider } from "@/components/SyncProvider";
+import { ContextMenuBlocker } from "@/components/ContextMenuBlocker";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -47,6 +48,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <GlobalPlayer />
         <ToastProvider />
         <SyncProvider />
+        <ContextMenuBlocker />
         <script
           dangerouslySetInnerHTML={{
             __html: `

@@ -79,10 +79,9 @@ export default function SettingsPage() {
         {!isInstalled && (
           <button 
             onClick={handleInstallClick}
-            disabled={!deferredPrompt}
-            className="mt-2 w-full md:w-auto px-6 py-3 rounded-full bg-primary text-text-white text-btn hover:bg-brand-dark transition-colors shadow-md disabled:opacity-50"
+            className="mt-2 w-full md:w-auto px-6 py-3 rounded-full bg-primary text-text-white text-btn hover:bg-brand-dark transition-colors shadow-md"
           >
-            Install PWA
+            Install T-Tune
           </button>
         )}
       </section>

@@ -76,6 +76,10 @@ export default function Home() {
           <AlbumSection />
           
           <ArtistSection />
+          
+          <ComposerSection />
+          
+          <LyricistSection />
 
         </div>
       </main>
@@ -88,7 +92,7 @@ export default function Home() {
 function LanguageSection() {
   const [languages, setLanguages] = useState<Language[]>([]);
   
-  useEffect(() => {
+  const loadData = () => {
     Promise.all([db.getAllLanguages(), db.getAllSongs()]).then(([langs, songs]) => {
       const songLanguages = new Set(songs.map(s => s.language?.toLowerCase()).filter(Boolean));
       const activeLangs = langs.filter(l => songLanguages.has(l.name.toLowerCase()));
@@ -97,6 +101,16 @@ function LanguageSection() {
       const shuffled = [...activeLangs].sort(() => 0.5 - Math.random());
       setLanguages(shuffled.slice(0, 8));
     });
+  };
+
+  useEffect(() => {
+    loadData();
+    window.addEventListener('database-synced', loadData);
+    window.addEventListener('database-updated', loadData);
+    return () => {
+      window.removeEventListener('database-synced', loadData);
+      window.removeEventListener('database-updated', loadData);
+    };
   }, []);
 
   if (languages.length === 0) return null;
@@ -134,13 +148,23 @@ function SongSection({ id, title, subtitle, limit, randomize }: { id: string, ti
   const [songs, setSongs] = useState<Song[]>([]);
   const { playSong, addPlaylistToQueue } = usePlayerStore();
 
-  useEffect(() => {
+  const loadData = () => {
     db.getAllSongs().then(all => {
        if (randomize) {
          all = all.sort(() => 0.5 - Math.random());
        }
        setSongs(all.slice(0, limit));
     });
+  };
+
+  useEffect(() => {
+    loadData();
+    window.addEventListener('database-synced', loadData);
+    window.addEventListener('database-updated', loadData);
+    return () => {
+      window.removeEventListener('database-synced', loadData);
+      window.removeEventListener('database-updated', loadData);
+    };
   }, [limit, randomize]);
 
   if (songs.length === 0) return null;
@@ -173,8 +197,33 @@ function SongSection({ id, title, subtitle, limit, randomize }: { id: string, ti
 
 function AlbumSection() {
   const [albums, setAlbums] = useState<Album[]>([]);
+  
+  const loadAlbumsWithCovers = async () => {
+    const [allAlbums, allSongs] = await Promise.all([
+      db.getAllAlbums(),
+      db.getAllSongs()
+    ]);
+    // If an album doesn't have a cover, resolve from songs in that album
+    const resolved = allAlbums.map(album => {
+      if (!album.cover) {
+        const songInAlbum = allSongs.find(s => s.album?.toLowerCase() === album.name.toLowerCase() && s.coverUrl);
+        if (songInAlbum?.coverUrl) {
+          return { ...album, cover: songInAlbum.coverUrl };
+        }
+      }
+      return album;
+    });
+    setAlbums(resolved);
+  };
+
   useEffect(() => {
-    db.getAllAlbums().then(all => setAlbums(all));
+    loadAlbumsWithCovers();
+    window.addEventListener('database-synced', loadAlbumsWithCovers);
+    window.addEventListener('database-updated', loadAlbumsWithCovers);
+    return () => {
+      window.removeEventListener('database-synced', loadAlbumsWithCovers);
+      window.removeEventListener('database-updated', loadAlbumsWithCovers);
+    };
   }, []);
 
   if (albums.length === 0) return null;
@@ -182,14 +231,19 @@ function AlbumSection() {
   return (
     <section id="featured" className="scroll-mt-6">
       <div className="mb-4">
-        <h2 className="text-section-heading text-text-dark dark:text-text-white">Featured Albums</h2>
+        <h2 className="text-section-heading text-text-dark dark:text-text-white">Albums</h2>
         <p className="text-metadata text-text-secondary dark:text-text-muted mt-1">Top offline selections from your library</p>
       </div>
       <div className="flex gap-4 overflow-x-auto custom-scrollbar pb-4 -mx-2 px-2">
         {albums.map((album) => (
-          <Link href="/search" key={album.id} className="flex-shrink-0 w-32 md:w-40 group cursor-pointer">
+          <Link href={`/album/${encodeURIComponent(album.name)}`} key={album.id} className="flex-shrink-0 w-32 md:w-40 group cursor-pointer">
             <div className="w-32 h-32 md:w-40 md:h-40 bg-light-pearl dark:bg-surface-cocoa rounded-xl mb-3 shadow-sm border border-light-silver dark:border-surface-ash overflow-hidden relative">
-               <img src={album.cover || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=500&q=80"} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+               <img 
+                 src={album.cover || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=500&q=80"} 
+                 alt={album.name} 
+                 onError={(e) => { (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=500&q=80"; }}
+                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+               />
                <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/20 transition-colors duration-300"></div>
             </div>
             <p className="text-album-title truncate text-text-dark dark:text-text-white group-hover:text-primary transition-colors">{album.name}</p>
@@ -204,8 +258,32 @@ function AlbumSection() {
 function ArtistSection() {
   const [artists, setArtists] = useState<Entity[]>([]);
   
+  const loadArtistsWithPhotos = async () => {
+    const [allSingers, allSongs] = await Promise.all([
+      db.getAllEntities("singers"),
+      db.getAllSongs()
+    ]);
+    // If an artist has no photoUrl, resolve from songs
+    const resolved = allSingers.map(artist => {
+      if (!artist.photoUrl) {
+        const songByArtist = allSongs.find(s => s.singers?.toLowerCase().includes(artist.name.toLowerCase()) && s.coverUrl);
+        if (songByArtist?.coverUrl) {
+          return { ...artist, photoUrl: songByArtist.coverUrl };
+        }
+      }
+      return artist;
+    });
+    setArtists(resolved);
+  };
+
   useEffect(() => {
-    db.getAllEntities("singers").then(setArtists);
+    loadArtistsWithPhotos();
+    window.addEventListener('database-synced', loadArtistsWithPhotos);
+    window.addEventListener('database-updated', loadArtistsWithPhotos);
+    return () => {
+      window.removeEventListener('database-synced', loadArtistsWithPhotos);
+      window.removeEventListener('database-updated', loadArtistsWithPhotos);
+    };
   }, []);
 
   if (artists.length === 0) return null;
@@ -223,11 +301,138 @@ function ArtistSection() {
         {artists.map((artist) => (
           <Link href={`/artist/${artist.id}`} key={artist.id} className="flex-shrink-0 w-32 md:w-40 group cursor-pointer">
             <div className="w-32 h-32 md:w-40 md:h-40 bg-light-pearl dark:bg-surface-cocoa rounded-full mb-3 shadow-sm border-2 border-light-silver dark:border-surface-ash overflow-hidden relative group-hover:border-primary transition-colors">
-               <img src={artist.photoUrl || "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80"} alt={artist.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+               <img 
+                 src={artist.photoUrl || "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80"} 
+                 alt={artist.name} 
+                 onError={(e) => { (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80"; }}
+                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+               />
                <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/20 transition-colors duration-300"></div>
             </div>
             <p className="text-album-title text-center truncate text-text-dark dark:text-text-white group-hover:text-primary transition-colors">{artist.name}</p>
             <p className="text-artist-name text-center truncate text-text-secondary dark:text-text-muted text-sm mt-1">Artist</p>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ComposerSection() {
+  const [composers, setComposers] = useState<Entity[]>([]);
+  
+  const loadComposersWithPhotos = async () => {
+    const [allMusicians, allSongs] = await Promise.all([
+      db.getAllEntities("musicians"),
+      db.getAllSongs()
+    ]);
+    const resolved = allMusicians.map(composer => {
+      if (!composer.photoUrl) {
+        const songByComposer = allSongs.find(s => s.musician?.toLowerCase().includes(composer.name.toLowerCase()) && s.coverUrl);
+        if (songByComposer?.coverUrl) {
+          return { ...composer, photoUrl: songByComposer.coverUrl };
+        }
+      }
+      return composer;
+    });
+    setComposers(resolved);
+  };
+
+  useEffect(() => {
+    loadComposersWithPhotos();
+    window.addEventListener('database-synced', loadComposersWithPhotos);
+    window.addEventListener('database-updated', loadComposersWithPhotos);
+    return () => {
+      window.removeEventListener('database-synced', loadComposersWithPhotos);
+      window.removeEventListener('database-updated', loadComposersWithPhotos);
+    };
+  }, []);
+
+  if (composers.length === 0) return null;
+
+  return (
+    <section id="composers" className="scroll-mt-6">
+      <div className="mb-4 flex items-end justify-between">
+        <div>
+          <h2 className="text-section-heading text-text-dark dark:text-text-white">Music (Composer)</h2>
+          <p className="text-metadata text-text-secondary dark:text-text-muted mt-1">Browse your library by composer</p>
+        </div>
+      </div>
+      
+      <div className="flex gap-4 overflow-x-auto custom-scrollbar pb-4 -mx-2 px-2">
+        {composers.map((composer) => (
+          <Link href={`/artist/${encodeURIComponent(composer.name)}`} key={composer.id} className="flex-shrink-0 w-32 md:w-40 group cursor-pointer">
+            <div className="w-32 h-32 md:w-40 md:h-40 bg-light-pearl dark:bg-surface-cocoa rounded-full mb-3 shadow-sm border-2 border-light-silver dark:border-surface-ash overflow-hidden relative group-hover:border-primary transition-colors">
+               <img 
+                 src={composer.photoUrl || "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80"} 
+                 alt={composer.name} 
+                 onError={(e) => { (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80"; }}
+                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+               />
+               <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/20 transition-colors duration-300"></div>
+            </div>
+            <p className="text-album-title text-center truncate text-text-dark dark:text-text-white group-hover:text-primary transition-colors">{composer.name}</p>
+            <p className="text-artist-name text-center truncate text-text-secondary dark:text-text-muted text-sm mt-1">Composer</p>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function LyricistSection() {
+  const [lyricists, setLyricists] = useState<Entity[]>([]);
+  
+  const loadLyricistsWithPhotos = async () => {
+    const [allLyricists, allSongs] = await Promise.all([
+      db.getAllEntities("lyricists"),
+      db.getAllSongs()
+    ]);
+    const resolved = allLyricists.map(lyricist => {
+      if (!lyricist.photoUrl) {
+        // Find if we have any photo for lyricist
+        return lyricist;
+      }
+      return lyricist;
+    });
+    setLyricists(resolved);
+  };
+
+  useEffect(() => {
+    loadLyricistsWithPhotos();
+    window.addEventListener('database-synced', loadLyricistsWithPhotos);
+    window.addEventListener('database-updated', loadLyricistsWithPhotos);
+    return () => {
+      window.removeEventListener('database-synced', loadLyricistsWithPhotos);
+      window.removeEventListener('database-updated', loadLyricistsWithPhotos);
+    };
+  }, []);
+
+  if (lyricists.length === 0) return null;
+
+  return (
+    <section id="lyricists" className="scroll-mt-6">
+      <div className="mb-4 flex items-end justify-between">
+        <div>
+          <h2 className="text-section-heading text-text-dark dark:text-text-white">Lyrics (Lyricist)</h2>
+          <p className="text-metadata text-text-secondary dark:text-text-muted mt-1">Browse your library by lyricist</p>
+        </div>
+      </div>
+      
+      <div className="flex gap-4 overflow-x-auto custom-scrollbar pb-4 -mx-2 px-2">
+        {lyricists.map((lyricist) => (
+          <Link href={`/artist/${encodeURIComponent(lyricist.name)}`} key={lyricist.id} className="flex-shrink-0 w-32 md:w-40 group cursor-pointer">
+            <div className="w-32 h-32 md:w-40 md:h-40 bg-light-pearl dark:bg-surface-cocoa rounded-full mb-3 shadow-sm border-2 border-light-silver dark:border-surface-ash overflow-hidden relative group-hover:border-primary transition-colors">
+               <img 
+                 src={lyricist.photoUrl || "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80"} 
+                 alt={lyricist.name} 
+                 onError={(e) => { (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80"; }}
+                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+               />
+               <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/20 transition-colors duration-300"></div>
+            </div>
+            <p className="text-album-title text-center truncate text-text-dark dark:text-text-white group-hover:text-primary transition-colors">{lyricist.name}</p>
+            <p className="text-artist-name text-center truncate text-text-secondary dark:text-text-muted text-sm mt-1">Lyricist</p>
           </Link>
         ))}
       </div>

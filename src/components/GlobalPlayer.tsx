@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Play, Pause, ChevronUp, Mic2, Shuffle, Repeat, SkipBack, SkipForward, Heart, ListMusic, Maximize2, Volume2, VolumeX, Volume1 } from "lucide-react";
+import { Play, Pause, ChevronUp, Mic2, Shuffle, Repeat, SkipBack, SkipForward, Heart, ListMusic, Maximize2, Volume2, VolumeX, Volume1, Info } from "lucide-react";
 import { usePlayerStore } from "@/store/playerStore";
 import { buttonPressVariants, albumFloatVariants, trackChangeVariants } from "@/lib/animations";
 import { QueueDrawer } from "./QueueDrawer";
@@ -12,7 +12,11 @@ import { SongInfoModal } from "./SongInfoModal";
 import { MarqueeText } from "./MarqueeText";
 
 export function GlobalPlayer() {
-  const { currentSong, isPlaying, pause, resume, playNext, playPrevious, isShuffle, toggleShuffle, isLoop, toggleLoop, favorites, toggleFavorite } = usePlayerStore();
+  const { 
+    currentSong, isPlaying, pause, resume, playNext, playPrevious, 
+    isShuffle, toggleShuffle, isLoop, toggleLoop, favorites, toggleFavorite,
+    isFullScreenOpen, openFullScreen, closeFullScreen 
+  } = usePlayerStore();
   const pathname = usePathname();
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -21,18 +25,47 @@ export function GlobalPlayer() {
   const [volume, setVolume] = useState(1); // 0.0 to 1.0
   const [isMuted, setIsMuted] = useState(false);
   const [isQueueOpen, setIsQueueOpen] = useState(false);
-  const [isFullScreenOpen, setIsFullScreenOpen] = useState(false);
   const [isInfoOpen, setIsInfoOpen] = useState(false);
 
+  // Automatically close full screen player when page route changes
   useEffect(() => {
-    setIsFullScreenOpen(false);
-    setIsInfoOpen(false);
-  }, [pathname]);
+    closeFullScreen();
+  }, [pathname, closeFullScreen]);
+
+  // Reset time on track change
+  useEffect(() => {
+    setCurrentTime(0);
+    setDuration(currentSong?.duration || 0);
+  }, [currentSong?.id]);
+
+  const togglePlay = () => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      pause();
+    } else {
+      const p = audioRef.current.play();
+      if (p !== undefined) {
+        p.then(() => resume()).catch(err => {
+          console.warn("Autoplay restriction on mobile:", err);
+          audioRef.current?.load();
+          audioRef.current?.play().then(() => resume()).catch(e => console.error("Play failed:", e));
+        });
+      } else {
+        resume();
+      }
+    }
+  };
 
   useEffect(() => {
-    if (audioRef.current) {
+    if (audioRef.current && currentSong?.url) {
       if (isPlaying) {
-        audioRef.current.play().catch(e => console.error("Audio playback error", e));
+        const p = audioRef.current.play();
+        if (p !== undefined) {
+          p.catch(e => {
+            console.warn("Audio autoplay blocked by browser policy:", e.name, e.message);
+          });
+        }
       } else {
         audioRef.current.pause();
       }
@@ -53,8 +86,14 @@ export function GlobalPlayer() {
 
   const handleTimeUpdate = () => {
     if (audioRef.current) {
-      setCurrentTime(audioRef.current.currentTime);
-      setDuration(audioRef.current.duration || 0);
+      const cur = audioRef.current.currentTime;
+      const dur = audioRef.current.duration;
+      if (!isNaN(cur) && isFinite(cur)) {
+        setCurrentTime(cur);
+      }
+      if (!isNaN(dur) && isFinite(dur) && dur > 0) {
+        setDuration(dur);
+      }
     }
   };
 
@@ -67,7 +106,7 @@ export function GlobalPlayer() {
   };
 
   const formatTime = (time: number) => {
-    if (!time || isNaN(time)) return "0:00";
+    if (!time || isNaN(time) || !isFinite(time)) return "0:00";
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
@@ -76,188 +115,217 @@ export function GlobalPlayer() {
   if (!currentSong || pathname?.startsWith('/admin')) return null;
 
   return (
-    <motion.footer 
-      layoutId="mini-player"
-      initial={{ y: "100%" }}
-      animate={{ y: 0 }}
-      exit={{ y: "100%" }}
-      transition={{ type: "spring", stiffness: 300, damping: 30 }}
-      className="fixed bottom-[68px] md:bottom-0 left-0 right-0 h-[64px] md:h-[90px] bg-light-pearl dark:bg-surface-cocoa border-t border-light-silver dark:border-surface-ash px-4 md:px-6 flex items-center justify-between z-40 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] cursor-pointer"
-      onClick={(e) => {
-        // Prevent opening if clicking on controls
-        if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('.group\\/vol') || (e.target as HTMLElement).closest('.flex-1.h-1')) return;
-        setIsFullScreenOpen(true);
-      }}
-    >
-      {/* LEFT: Cover & Info */}
-      <div className="flex-1 md:flex-none md:w-1/3 overflow-hidden pr-4">
-        <AnimatePresence mode="popLayout">
-          <motion.div 
-            key={currentSong.id}
-            variants={trackChangeVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            className="flex items-center gap-3 w-full"
-          >
+    <>
+      <motion.footer 
+        layoutId="mini-player"
+        initial={{ y: "100%" }}
+        animate={{ y: 0 }}
+        exit={{ y: "100%" }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        className="fixed bottom-[68px] md:bottom-0 left-0 right-0 h-[64px] md:h-[90px] bg-light-pearl dark:bg-surface-cocoa border-t border-light-silver dark:border-surface-ash px-4 md:px-6 flex items-center justify-between z-40 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] cursor-pointer"
+        onClick={(e) => {
+          // Prevent opening if clicking on controls
+          if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('.group\\/vol') || (e.target as HTMLElement).closest('.flex-1.h-1')) return;
+          openFullScreen();
+        }}
+      >
+        {/* LEFT: Cover & Info */}
+        <div className="flex-1 md:flex-none md:w-1/3 overflow-hidden pr-4">
+          <AnimatePresence mode="popLayout">
             <motion.div 
-               variants={albumFloatVariants}
-               initial="initial"
-               animate="animate"
-               className="w-12 h-12 md:w-14 md:h-14 bg-music-lavender rounded-md shadow-sm overflow-hidden flex items-center justify-center text-text-white bg-music-vinyl ring-1 md:ring-2 ring-surface-taupe flex-shrink-0 relative"
+              key={currentSong.id}
+              variants={trackChangeVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              className="flex items-center gap-3 w-full"
             >
-              {currentSong.coverUrl ? (
-                <img src={currentSong.coverUrl} alt="cover" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-bg-midnight absolute z-10" />
-              )}
+              <motion.div 
+                 variants={albumFloatVariants}
+                 initial="initial"
+                 animate="animate"
+                 className="w-12 h-12 md:w-14 md:h-14 bg-music-lavender rounded-md shadow-sm overflow-hidden flex items-center justify-center text-text-white bg-music-vinyl ring-1 md:ring-2 ring-surface-taupe flex-shrink-0 relative"
+              >
+                {currentSong.coverUrl ? (
+                  <img 
+                    src={currentSong.coverUrl} 
+                    alt={currentSong.title} 
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    className="w-full h-full object-cover" 
+                  />
+                ) : (
+                  <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-bg-midnight absolute z-10" />
+                )}
+              </motion.div>
+              <div className="overflow-hidden flex flex-col justify-center flex-1 min-w-0">
+                <MarqueeText className="text-track-title text-text-dark dark:text-text-white">{currentSong.title}</MarqueeText>
+                <MarqueeText className="text-label text-text-secondary dark:text-text-muted -mt-0.5">
+                  {[currentSong.singers, currentSong.musician].filter(Boolean).join(", ")} {currentSong.album ? `- ${currentSong.album}` : ""}
+                </MarqueeText>
+              </div>
             </motion.div>
-            <div className="overflow-hidden flex flex-col justify-center flex-1 min-w-0">
-              <MarqueeText className="text-track-title text-text-dark dark:text-text-white">{currentSong.title}</MarqueeText>
-              <MarqueeText className="text-label text-text-secondary dark:text-text-muted -mt-0.5">
-                {[currentSong.singers, currentSong.musician].filter(Boolean).join(", ")} {currentSong.album ? `- ${currentSong.album}` : ""}
-              </MarqueeText>
-            </div>
-          </motion.div>
-        </AnimatePresence>
-      </div>
-      
-      {/* MIDDLE: Controls (Desktop) */}
-      <div className="hidden md:flex flex-col items-center justify-center group cursor-pointer gap-2 w-1/3">
-        <div className="flex items-center justify-center gap-6 mb-1">
-          <motion.button 
-             variants={buttonPressVariants} initial="initial" whileTap="tap" 
-             onClick={toggleShuffle}
-             className={`${isShuffle ? 'text-primary' : 'text-text-muted hover:text-text-dark dark:hover:text-text-white'} transition-colors`}
-          >
-            <Shuffle size={18} />
-          </motion.button>
-          
-          <motion.button 
-            variants={buttonPressVariants} initial="initial" whileTap="tap"
-            onClick={playPrevious}
-            className="text-text-dark dark:text-text-white hover:text-primary transition-colors"
-          >
-            <SkipBack size={22} fill="currentColor" />
-          </motion.button>
-          
-          <motion.button 
-            variants={buttonPressVariants} initial="initial" whileTap="tap"
-            onClick={isPlaying ? pause : resume}
-            className="w-10 h-10 flex items-center justify-center rounded-full bg-text-dark dark:bg-text-white text-white dark:text-bg-charcoal hover:scale-105 transition-transform shadow-md"
-          >
-            {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-1" />}
-          </motion.button>
-          
-          <motion.button 
-            variants={buttonPressVariants} initial="initial" whileTap="tap"
-            onClick={playNext}
-            className="text-text-dark dark:text-text-white hover:text-primary transition-colors"
-          >
-            <SkipForward size={22} fill="currentColor" />
-          </motion.button>
-          
-          <motion.button 
-            variants={buttonPressVariants} 
-            initial="initial" 
-            whileTap="tap" 
-            onClick={(e) => { e.stopPropagation(); toggleFavorite(currentSong.id); }}
-            className={`transition-colors ${favorites.includes(currentSong.id) ? 'text-status-error' : 'text-text-muted hover:text-text-dark dark:hover:text-text-white'}`}
-          >
-            <Heart size={20} fill={favorites.includes(currentSong.id) ? 'currentColor' : 'none'} />
-          </motion.button>
+          </AnimatePresence>
         </div>
         
-        <div className="w-full max-w-md flex items-center gap-3">
-          <span className="text-player-time text-text-secondary dark:text-text-muted">{formatTime(currentTime)}</span>
-          <div 
-             className="flex-1 h-1 bg-light-warm-grey dark:bg-surface-ash rounded-full relative overflow-hidden group-hover:h-1.5 transition-all cursor-pointer"
-             onClick={handleSeek}
-          >
+        {/* MIDDLE: Controls (Desktop) */}
+        <div className="hidden md:flex flex-col items-center justify-center group cursor-pointer gap-2 w-1/3">
+          <div className="flex items-center justify-center gap-6 mb-1">
+            <motion.button 
+               variants={buttonPressVariants} initial="initial" whileTap="tap" 
+               onClick={toggleShuffle}
+               className={`${isShuffle ? 'text-primary' : 'text-text-muted hover:text-text-dark dark:hover:text-text-white'} transition-colors`}
+            >
+              <Shuffle size={18} />
+            </motion.button>
+            
+            <motion.button 
+              variants={buttonPressVariants} initial="initial" whileTap="tap"
+              onClick={playPrevious}
+              className="text-text-dark dark:text-text-white hover:text-primary transition-colors"
+            >
+              <SkipBack size={22} fill="currentColor" />
+            </motion.button>
+            
+            <motion.button 
+              variants={buttonPressVariants} initial="initial" whileTap="tap"
+              onClick={(e) => { e.stopPropagation(); togglePlay(); }}
+              className="w-10 h-10 flex items-center justify-center rounded-full bg-text-dark dark:bg-text-white text-white dark:text-bg-charcoal hover:scale-105 transition-transform shadow-md"
+            >
+              {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-1" />}
+            </motion.button>
+            
+            <motion.button 
+              variants={buttonPressVariants} initial="initial" whileTap="tap"
+              onClick={playNext}
+              className="text-text-dark dark:text-text-white hover:text-primary transition-colors"
+            >
+              <SkipForward size={22} fill="currentColor" />
+            </motion.button>
+            
+            <motion.button 
+              variants={buttonPressVariants} 
+              initial="initial" 
+              whileTap="tap" 
+              onClick={(e) => { e.stopPropagation(); toggleFavorite(currentSong.id); }}
+              className={`transition-colors ${favorites.includes(currentSong.id) ? 'text-status-error' : 'text-text-muted hover:text-text-dark dark:hover:text-text-white'}`}
+            >
+              <Heart size={20} fill={favorites.includes(currentSong.id) ? 'currentColor' : 'none'} />
+            </motion.button>
+          </div>
+          
+          <div className="w-full max-w-md flex items-center gap-3">
+            <span className="text-player-time text-text-secondary dark:text-text-muted">{formatTime(currentTime)}</span>
             <div 
-              className="absolute left-0 top-0 bottom-0 bg-text-dark dark:bg-text-white rounded-full group-hover:bg-primary transition-colors"
-              style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
-            ></div>
+               className="flex-1 h-1 bg-light-warm-grey dark:bg-surface-ash rounded-full relative overflow-hidden group-hover:h-1.5 transition-all cursor-pointer"
+               onClick={handleSeek}
+            >
+              <div 
+                className="absolute left-0 top-0 bottom-0 bg-text-dark dark:bg-text-white rounded-full group-hover:bg-primary transition-colors"
+                style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
+              ></div>
+            </div>
+            <span className="text-player-time text-text-secondary dark:text-text-muted">
+              {formatTime(duration || currentSong.duration || 0)}
+            </span>
           </div>
-          <span className="text-player-time text-text-secondary dark:text-text-muted">
-            {formatTime(duration || currentSong.duration || 0)}
-          </span>
         </div>
-      </div>
-      
-      {/* RIGHT: Extra Actions (Mobile vs Desktop) */}
-      <div className="flex md:w-1/3 justify-end items-center gap-4 text-text-muted flex-shrink-0">
         
-        {/* Mobile-only compact controls */}
-        <div className="md:hidden flex items-center gap-3">
-          <motion.button variants={buttonPressVariants} whileTap="tap" onClick={playPrevious}>
-            <SkipBack size={20} className="text-text-dark dark:text-text-white" fill="currentColor" />
-          </motion.button>
-          <motion.button 
-            variants={buttonPressVariants} initial="initial" whileTap="tap"
-            onClick={isPlaying ? pause : resume}
-            className="w-10 h-10 flex items-center justify-center rounded-full bg-text-dark dark:bg-text-white text-white dark:text-bg-charcoal"
-          >
-            {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-0.5" />}
-          </motion.button>
-          <motion.button variants={buttonPressVariants} whileTap="tap" onClick={playNext}>
-            <SkipForward size={20} className="text-text-dark dark:text-text-white" fill="currentColor" />
-          </motion.button>
-        </div>
-
-        {/* Desktop-only secondary controls */}
-        <div className="hidden md:flex items-center gap-4">
-          <button onClick={toggleLoop} className={`transition-colors ${isLoop ? 'text-primary' : 'hover:text-text-dark dark:hover:text-text-white'}`} title="Loop">
-             <Repeat size={18} />
-          </button>
-          <div className="group/vol flex items-center gap-2 relative">
-             <button onClick={() => setIsMuted(!isMuted)} className="hover:text-text-dark dark:hover:text-text-white transition-colors">
-               {isMuted || volume === 0 ? <VolumeX size={18} /> : volume < 0.5 ? <Volume1 size={18} /> : <Volume2 size={18} />}
-             </button>
-             <div className="w-0 group-hover/vol:w-20 overflow-hidden transition-all duration-300 flex items-center">
-                <input 
-                  type="range" 
-                  min="0" max="1" step="0.01"
-                  value={isMuted ? 0 : volume}
-                  onChange={(e) => {
-                    setVolume(parseFloat(e.target.value));
-                    if (parseFloat(e.target.value) > 0) setIsMuted(false);
-                  }}
-                  className="w-20 h-1.5 bg-light-silver dark:bg-surface-ash rounded-lg appearance-none cursor-pointer accent-primary"
-                />
-             </div>
+        {/* RIGHT: Extra Actions (Mobile vs Desktop) */}
+        <div className="flex md:w-1/3 justify-end items-center gap-4 text-text-muted flex-shrink-0">
+          
+          {/* Mobile-only compact controls */}
+          <div className="md:hidden flex items-center gap-1.5 sm:gap-2">
+            <motion.button 
+              variants={buttonPressVariants} 
+              whileTap="tap" 
+              onClick={(e) => { e.stopPropagation(); toggleFavorite(currentSong.id); }}
+              className={`p-1.5 ${favorites.includes(currentSong.id) ? 'text-status-error' : 'text-text-muted hover:text-text-dark dark:hover:text-text-white'}`}
+            >
+              <Heart size={18} fill={favorites.includes(currentSong.id) ? 'currentColor' : 'none'} />
+            </motion.button>
+            <motion.button variants={buttonPressVariants} whileTap="tap" onClick={(e) => { e.stopPropagation(); playPrevious(); }} className="p-1">
+              <SkipBack size={18} className="text-text-dark dark:text-text-white" fill="currentColor" />
+            </motion.button>
+            <motion.button 
+              variants={buttonPressVariants} initial="initial" whileTap="tap"
+              onClick={(e) => { e.stopPropagation(); togglePlay(); }}
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-text-dark dark:bg-text-white text-white dark:text-bg-charcoal flex-shrink-0"
+            >
+              {isPlaying ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" className="ml-0.5" />}
+            </motion.button>
+            <motion.button variants={buttonPressVariants} whileTap="tap" onClick={(e) => { e.stopPropagation(); playNext(); }} className="p-1">
+              <SkipForward size={18} className="text-text-dark dark:text-text-white" fill="currentColor" />
+            </motion.button>
+            <button onClick={(e) => { e.stopPropagation(); setIsInfoOpen(true); }} className="p-1.5 text-text-muted hover:text-text-dark dark:hover:text-text-white transition-colors">
+               <Info size={18} />
+            </button>
           </div>
-          <button title="Queue" onClick={(e) => { e.stopPropagation(); setIsQueueOpen(!isQueueOpen); }} className={`flex items-center gap-1.5 text-xs font-bold ${isQueueOpen ? 'text-primary' : 'hover:text-text-dark dark:hover:text-text-white'} transition-colors`}>
-             <ListMusic size={16} /> Queue
-          </button>
-          <button title="More Info" onClick={(e) => { e.stopPropagation(); setIsInfoOpen(true); }} className="flex items-center gap-1.5 text-xs font-bold hover:text-text-dark dark:hover:text-text-white transition-colors">
-             More Info
-          </button>
-          <button title="Full Screen Player" onClick={(e) => { e.stopPropagation(); setIsFullScreenOpen(true); }}>
-             <Maximize2 size={16} className="hover:text-text-dark dark:hover:text-text-white cursor-pointer transition-colors" />
-          </button>
+
+          {/* Desktop-only secondary controls */}
+          <div className="hidden md:flex items-center gap-4">
+            <button onClick={toggleLoop} className={`transition-colors ${isLoop ? 'text-primary' : 'hover:text-text-dark dark:hover:text-text-white'}`} title="Loop">
+               <Repeat size={18} />
+            </button>
+            <div className="group/vol flex items-center gap-2 relative">
+               <button onClick={() => setIsMuted(!isMuted)} className="hover:text-text-dark dark:hover:text-text-white transition-colors">
+                 {isMuted || volume === 0 ? <VolumeX size={18} /> : volume < 0.5 ? <Volume1 size={18} /> : <Volume2 size={18} />}
+               </button>
+               <div className="w-0 group-hover/vol:w-20 overflow-hidden transition-all duration-300 flex items-center">
+                  <input 
+                    type="range" 
+                    min="0" max="1" step="0.01"
+                    value={isMuted ? 0 : volume}
+                    onChange={(e) => {
+                      setVolume(parseFloat(e.target.value));
+                      if (parseFloat(e.target.value) > 0) setIsMuted(false);
+                    }}
+                    className="w-20 h-1.5 bg-light-silver dark:bg-surface-ash rounded-lg appearance-none cursor-pointer accent-primary"
+                  />
+               </div>
+            </div>
+            <button title="Queue" onClick={(e) => { e.stopPropagation(); setIsQueueOpen(!isQueueOpen); }} className={`flex items-center gap-1.5 text-xs font-bold ${isQueueOpen ? 'text-primary' : 'hover:text-text-dark dark:hover:text-text-white'} transition-colors`}>
+               <ListMusic size={16} /> Queue
+            </button>
+            <button title="More Info" onClick={(e) => { e.stopPropagation(); setIsInfoOpen(true); }} className="flex items-center gap-1.5 text-xs font-bold hover:text-text-dark dark:hover:text-text-white transition-colors">
+               More Info
+            </button>
+            <button title="Full Screen Player" onClick={(e) => { e.stopPropagation(); openFullScreen(); }}>
+               <Maximize2 size={16} className="hover:text-text-dark dark:hover:text-text-white cursor-pointer transition-colors" />
+            </button>
+          </div>
         </div>
-      </div>
-      
+      </motion.footer>
+
       {/* Hidden actual audio player */}
       <audio 
         ref={audioRef}
         src={currentSong.url}
+        preload="auto"
+        playsInline={true}
         onTimeUpdate={handleTimeUpdate}
         onEnded={playNext}
         onLoadedMetadata={handleTimeUpdate}
+        onDurationChange={handleTimeUpdate}
+        onCanPlay={handleTimeUpdate}
+        onPlay={() => { if (!isPlaying) resume(); }}
+        onPause={() => { if (isPlaying) pause(); }}
+        onError={(e) => {
+          console.error("Audio playback error on track:", currentSong.url, e);
+        }}
       />
       
-      {/* Modals & Overlays */}
+      {/* Modals & Overlays (Rendered outside footer so they are not constrained) */}
       <QueueDrawer isOpen={isQueueOpen} onClose={() => setIsQueueOpen(false)} />
       
       <FullScreenPlayer 
         isOpen={isFullScreenOpen} 
-        onClose={() => setIsFullScreenOpen(false)} 
+        onClose={closeFullScreen} 
         audioRef={audioRef}
         currentTime={currentTime}
         duration={duration}
         handleSeek={handleSeek}
+        onOpenInfo={() => setIsInfoOpen(true)}
+        onTogglePlay={togglePlay}
       />
       
       <SongInfoModal 
@@ -265,6 +333,6 @@ export function GlobalPlayer() {
         onClose={() => setIsInfoOpen(false)}
         song={currentSong}
       />
-    </motion.footer>
+    </>
   );
 }
